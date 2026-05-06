@@ -1,0 +1,428 @@
+[
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T10:23:58.489352+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T10:23:58.446327+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T10:23:58.390397+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T10:23:58.353415+00:00",
+    "details": {}
+  },
+  {
+    "action": "Indexed: YOLO Best Model Deployment Protocol",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-05T10:03:25.346293+00:00",
+    "details": {
+      "language": "python",
+      "slug": "yolo-best-model-deployment-protocol"
+    }
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T07:56:39.768999+00:00",
+    "details": {}
+  },
+  {
+    "action": "Activated Node: system_monitor",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T07:41:26.939013+00:00",
+    "details": {
+      "slug": "system-monitor"
+    }
+  },
+  {
+    "action": "Activated Node: Chatbot Stress Test",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T07:41:26.238926+00:00",
+    "details": {
+      "slug": "chatbot-stress-test"
+    }
+  },
+  {
+    "action": "Staged Node: system_monitor",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-05T07:41:16.873196+00:00",
+    "details": {
+      "language": "python",
+      "slug": "system-monitor"
+    }
+  },
+  {
+    "action": "Staged Node: Chatbot Stress Test",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-05T07:41:14.908086+00:00",
+    "details": {
+      "language": "python",
+      "slug": "chatbot-stress-test"
+    }
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T07:38:46.911096+00:00",
+    "details": {}
+  },
+  {
+    "action": "Indexed: Chatbot Stress Test",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-05T07:38:38.665926+00:00",
+    "details": {
+      "language": "python",
+      "slug": "chatbot-stress-test"
+    }
+  },
+  {
+    "action": "Activated Node: get system stats",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T06:17:15.751351+00:00",
+    "details": {
+      "slug": "get-system-stats"
+    }
+  },
+  {
+    "action": "Governance Sync: ['chat_limit', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T06:13:42.471519+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['chat_limit', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T06:12:23.955773+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['chat_limit', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T06:11:54.007877+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T06:11:48.125769+00:00",
+    "details": {}
+  },
+  {
+    "action": "Sandbox Simulation",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T06:07:39.591482+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['maintenance_mode']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T06:07:16.413588+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['maintenance_mode']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T06:07:14.883895+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T06:03:30.851385+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T06:03:13.285872+00:00",
+    "details": {}
+  },
+  {
+    "action": "Staged Node: get system stats",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-05T05:06:43.426346+00:00",
+    "details": {
+      "language": "python",
+      "slug": "get-system-stats"
+    }
+  },
+  {
+    "action": "Terminated Node: system_monitor",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T05:01:12.157384+00:00",
+    "details": {
+      "slug": "system-monitor"
+    }
+  },
+  {
+    "action": "Terminated Node: get system stats",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T05:01:10.198584+00:00",
+    "details": {
+      "slug": "get-system-stats"
+    }
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T05:00:59.431431+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T05:00:52.448044+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T05:00:49.096329+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T05:00:40.800782+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T05:00:32.891764+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T05:00:16.682380+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T05:00:09.932867+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T05:00:00.484007+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T04:59:48.668529+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T04:59:44.248835+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T04:59:34.386468+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T04:59:19.636575+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T04:59:12.815437+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T04:52:38.733709+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T04:50:19.791752+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T04:50:05.511190+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T04:42:58.793895+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['broadcast', 'chat_limit', 'maintenance_mode', 'node_limit', 'request_rate', 'storage_limit']",
+    "user": "ROOT",
+    "timestamp": "2026-05-05T04:40:55.160403+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-04T11:25:34.082576+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-04T11:12:35.941418+00:00",
+    "details": {}
+  },
+  {
+    "action": "Staged Node: get system stats",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-04T11:12:13.732731+00:00",
+    "details": {
+      "language": "python",
+      "slug": "get-system-stats"
+    }
+  },
+  {
+    "action": "Staged Node: system_monitor",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-04T11:12:12.442027+00:00",
+    "details": {
+      "language": "python",
+      "slug": "system-monitor"
+    }
+  },
+  {
+    "action": "Indexed: get system stats",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-04T11:11:55.210600+00:00",
+    "details": {
+      "language": "python",
+      "slug": "get-system-stats"
+    }
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T22:21:23.901184+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T22:14:39.428980+00:00",
+    "details": {}
+  },
+  {
+    "action": "Terminal Exec",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T22:12:44.417734+00:00",
+    "details": {
+      "command": "help"
+    }
+  },
+  {
+    "action": "Terminal Exec",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T22:12:32.814433+00:00",
+    "details": {
+      "command": "ls"
+    }
+  },
+  {
+    "action": "Terminal Exec",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T22:12:27.066990+00:00",
+    "details": {
+      "command": "ls of"
+    }
+  },
+  {
+    "action": "Terminal Exec",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T22:12:15.877951+00:00",
+    "details": {
+      "command": "help"
+    }
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T22:12:00.183545+00:00",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T22:09:42.314537+00:00",
+    "details": {}
+  },
+  {
+    "action": "Staged Node: system_monitor",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-03T22:09:03.958172+00:00",
+    "details": {
+      "language": "python",
+      "slug": "system-monitor"
+    }
+  },
+  {
+    "action": "Indexed: system_monitor",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-03T22:08:50.726334+00:00",
+    "details": {
+      "language": "python",
+      "slug": "system-monitor"
+    }
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T22:02:31.838159+00:00",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['chat_limit', 'storage_limit', 'node_limit', 'request_rate', 'admin_pass', 'maintenance_mode', 'broadcast']",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-03T21:48:21.152510",
+    "details": {}
+  },
+  {
+    "action": "Governance Sync: ['chat_limit', 'storage_limit', 'node_limit', 'request_rate', 'admin_pass', 'maintenance_mode', 'broadcast']",
+    "user": "SYSTEM",
+    "timestamp": "2026-05-03T21:48:18.825275",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T21:47:55.637939",
+    "details": {}
+  },
+  {
+    "action": "Admin Login",
+    "user": "ROOT",
+    "timestamp": "2026-05-03T21:46:04.132143",
+    "details": {}
+  }
+]

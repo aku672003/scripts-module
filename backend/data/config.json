@@ -1,0 +1,9 @@
+{
+  "chat_limit": 1000000000,
+  "storage_limit": 1000000000,
+  "node_limit": 1000000000,
+  "request_rate": 1000000000,
+  "maintenance_mode": false,
+  "broadcast": "DO IT YOURSELF",
+  "admin_pass_hash": "pbkdf2_sha256$240000$R0hPU1RfU0hFTExfU0FMVA==$8AKS3qn_RcPOtPE9StAb84FQVz-u4A5roZi8YDgpkfc="
+}
