@@ -42,42 +42,27 @@ fi
 echo "Installing backend dependencies..."
 "$VENV_DIR/bin/pip" install -r "$BACKEND_DIR/requirements.txt"
 
-needs_frontend_build=false
-if [ ! -f "$FRONTEND_DIST_INDEX" ]; then
-    needs_frontend_build=true
-elif find "$FRONTEND_DIR/src" "$FRONTEND_DIR/index.html" "$FRONTEND_DIR/package.json" "$FRONTEND_DIR/package-lock.json" -newer "$FRONTEND_DIST_INDEX" -print -quit | grep -q .; then
-    needs_frontend_build=true
+# Ensure frontend dependencies are installed
+if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+    echo "Installing frontend dependencies..."
+    npm install --prefix "$FRONTEND_DIR"
 fi
 
-if [ "$needs_frontend_build" = true ]; then
-    if ! command -v npm >/dev/null 2>&1; then
-        echo "Error: npm is required to build the frontend."
-        exit 1
-    fi
+# Function to clean up background processes when the script stops
+cleanup() {
+    echo -e "\nShutting down servers..."
+    kill $BACKEND_PID 2>/dev/null
+    exit
+}
+# Trigger the cleanup function when we press Ctrl+C
+trap cleanup SIGINT SIGTERM EXIT
 
-    if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
-        echo "Installing frontend dependencies..."
-        npm ci --prefix "$FRONTEND_DIR"
-    fi
-
-    echo "Building frontend bundle..."
-    npm run build --prefix "$FRONTEND_DIR"
-else
-    echo "Frontend bundle is up to date."
-fi
-
-AVAILABLE_PORT="$(find_available_port "$PORT")"
-if [ -z "$AVAILABLE_PORT" ]; then
-    echo "Error: no free port found in range $PORT-$((PORT + 24))."
-    exit 1
-fi
-
-if [ "$AVAILABLE_PORT" != "$PORT" ]; then
-    echo "Port $PORT is busy. Switching to $AVAILABLE_PORT."
-fi
-PORT="$AVAILABLE_PORT"
-
-echo "Starting full stack app on http://localhost:$PORT"
+echo "Starting backend server on port 1818 in the background..."
 cd "$ROOT_DIR"
 export PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
-exec "$VENV_DIR/bin/uvicorn" backend.app.main:app --host 0.0.0.0 --port "$PORT" --reload
+"$VENV_DIR/bin/uvicorn" backend.app.main:app --host 0.0.0.0 --port 1818 --reload &
+BACKEND_PID=$!
+
+echo "Starting frontend dev server (port 8003) in the foreground..."
+cd "$FRONTEND_DIR"
+npm run dev -- --host 0.0.0.0
