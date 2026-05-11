@@ -368,25 +368,25 @@ function App() {
       setEditedClassesText(result.classes.join(', '));
      } catch (error) {
       await new Promise(r => setTimeout(r, 800));
-      addLog("🚀 Initializing Dataset Forge Engine...", 'system');
+      addLog("🚀 INITIALIZING NEURAL_CORE V5...", 'system');
       await new Promise(r => setTimeout(r, 600));
-      addLog("📂 Scanning model metadata...", 'info');
+      addLog("📂 SCANNING WEIGHTS METADATA...", 'info');
       await new Promise(r => setTimeout(r, 1000));
-      addLog("⚠️ Real-time backend disconnected. Using browser-side scanner.", 'error');
+      addLog("⚠️ LOCAL_BACKEND_OFFLINE: Use ./run.sh for real Python recognition.", 'error');
       
-      const scannerClasses = ["Processing_Required"];
+      const v5Classes = ["Awaiting_Neural_Sync"];
       setForgedModelData({
         name: file.name.split('.')[0].toUpperCase(),
-        description: "Neural specification (Offline Scanner).",
-        author: "FORGE_OFFLINE",
-        technical_overview: "Please run backend locally for full recognition via forge_engine.py.",
-        key_features: ["Manual config required"],
+        description: "Neural Core V5 (Offline Mode).",
+        author: "CORE_V5",
+        technical_overview: "Recognition engine is ready. Please connect to local backend for deep weight inspection.",
+        key_features: ["Manual config enabled"],
         quality_score: "N/A",
         risk_level: "UNKNOWN",
-        classes: scannerClasses,
-        version: "1.0.0"
+        classes: v5Classes,
+        version: "5.0.1"
       });
-      setEditedClassesText(scannerClasses.join(', '));
+      setEditedClassesText(v5Classes.join(', '));
     }
 
     setModelForging(false);
