@@ -576,107 +576,88 @@ function App() {
   );
 
   return (
-    <div className={`app-shell ${isCompactLayout ? 'compact' : ''}`}>
+    <div className="app-shell">
       <div className={`mobile-overlay ${isSidebarOpen ? 'active' : ''}`} onClick={() => setIsSidebarOpen(false)} />
-      <aside className={`sidebar glass-premium ${isSidebarOpen ? 'open' : ''}`} style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-        <div className="brand-block" style={{ marginBottom: '40px' }}>
-          <div className="logo-box" style={{ background: 'linear-gradient(135deg, var(--primary), var(--accent))', color: '#fff', fontSize: '1.8rem' }}>G</div>
-          <div className="brand-copy">
-            <h1 style={{ fontSize: '1.2rem', letterSpacing: '0.2em' }}>GHOST_SHELL</h1>
-            <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', letterSpacing: '0.05em' }}>v4.5.2 // NEURAL_CORE</p>
-          </div>
+      
+      {/* Sidebar - ChatGPT Style */}
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <button className="new-chat-btn" onClick={() => { setMessages([{ id: 1, role: 'bot', text: 'Hello. I am your Neural Assistant. How can I help you today?' }]); setActiveTab('navigator'); }}>
+            <PlusCircle size={18} />
+            New Chat
+          </button>
         </div>
 
-        <div className="sidebar-intel glass-premium" style={{ padding: '20px', borderRadius: 'var(--radius-lg)', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '32px' }}>
-          <div className="sidebar-intel-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-            <div>
-              <span className="sidebar-kicker" style={{ color: 'var(--primary)', fontSize: '0.6rem', fontWeight: '800' }}>SYS_PULSE</span>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{config.broadcast || 'Operational'}</p>
+        <div className="nav-group custom-scrollbar">
+          <div className="nav-item active" onClick={() => setActiveTab('navigator')}>
+            <MessageSquare size={18} />
+            Assistant
+          </div>
+          <div className="nav-item" onClick={() => setActiveTab('library')}>
+            <Archive size={18} />
+            Archive Vault
+          </div>
+          <div className="nav-item" onClick={() => setActiveTab('deploy')}>
+            <PlusCircle size={18} />
+            Protocol Forge
+          </div>
+          <div className="nav-item" onClick={() => setActiveTab('deployments')}>
+            <ActivityIcon size={18} />
+            Live Operations
+          </div>
+          <div className="nav-item" onClick={() => setActiveTab('neural_vault')}>
+            <Database size={18} />
+            Neural Archive
+          </div>
+          <div className="nav-item" onClick={() => setActiveTab('models')}>
+            <Cpu size={18} />
+            Model Forge
+          </div>
+          {isAdmin && (
+            <div className="nav-item" onClick={() => setActiveTab('admin')}>
+              <ShieldCheck size={18} />
+              Admin Console
             </div>
-            <StatusBadge label={config.maintenance_mode ? 'Locked' : 'Active'} tone={topStatusTone} />
-          </div>
-          <div className="sidebar-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-            {[
-              { label: 'Protocols', val: scripts.length },
-              { label: 'Live', val: deployedCount },
-              { label: 'Staged', val: stagedCount }
-            ].map(m => (
-              <div key={m.label} style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid rgba(255,255,255,0.02)' }}>
-                <span style={{ fontSize: '0.55rem', color: 'var(--text-dim)', display: 'block', marginBottom: '4px' }}>{m.label.toUpperCase()}</span>
-                <strong style={{ fontSize: '1rem', fontWeight: '800' }}>{m.val}</strong>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
 
-        <nav className="sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {[
-            { id: 'navigator', label: 'Neural Assistant', icon: <Terminal size={20} /> },
-            { id: 'library', label: 'Archive Vault', icon: <Archive size={20} /> },
-            { id: 'deploy', label: 'Protocol Forge', icon: <PlusCircle size={20} /> },
-            { id: 'deployments', label: 'Live Operations', icon: <ActivityIcon size={20} /> },
-            { id: 'neural_vault', label: 'Neural Archive', icon: <Database size={20} /> },
-            { id: 'models', label: 'Model Forge', icon: <Cpu size={20} /> },
-            ...(isAdmin ? [{ id: 'admin', label: 'Admin Console', icon: <ShieldCheck size={20} /> }] : [])
-          ].map(item => (
-            <button 
-              key={item.id} 
-              onClick={() => {
-                setActiveTab(item.id);
-                setIsSidebarOpen(false);
-              }} 
-              className={`nav-item ${activeTab === item.id ? 'active' : ''}`} 
-              style={{ 
-                width: '100%', 
-                textAlign: 'left', 
-                border: 'none', 
-                background: 'none', 
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px',
-                padding: '14px 20px',
-                borderRadius: 'var(--radius-md)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-              }}
-            >
-              <span style={{ color: activeTab === item.id ? 'var(--primary)' : 'inherit' }}>{item.icon}</span>
-              <span style={{ flex: 1 }}>{item.label}</span>
-              {activeTab === item.id && <motion.div layoutId="active-nav" style={{ width: '4px', height: '16px', background: 'var(--primary)', borderRadius: '999px' }} />}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-footer">
+        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '12px' }}>
           {!isAdmin ? (
-            <button onClick={() => setShowLogin(true)} className="nav-item sidebar-auth" style={{ width: '100%', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)', cursor: 'pointer', justifyContent: 'center' }}><Lock size={16} /> Authenticate</button>
+            <div className="nav-item" onClick={() => setShowLogin(true)}>
+              <Lock size={18} />
+              Authenticate
+            </div>
           ) : (
-            <button onClick={handleLogout} className="nav-item sidebar-auth active-root" style={{ width: '100%', color: 'var(--primary)', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', fontWeight: '800', cursor: 'pointer', justifyContent: 'center' }}><ShieldAlert size={16} /> LOGOUT_ROOT</button>
+            <div className="nav-item" onClick={handleLogout} style={{ color: '#ff4b4b' }}>
+              <Power size={18} />
+              Logout Root
+            </div>
           )}
         </div>
       </aside>
 
-      <main className="main-viewport glass">
+      <main className="main-viewport">
         <div className="top-ribbon">
           <button className="mobile-nav-toggle" onClick={() => setIsSidebarOpen(true)}>
-            <Menu size={24} />
+            <Menu size={20} />
           </button>
-          <div className="ribbon-status">
-            <Radio size={14} className="status-dot" />
-            <span className="mono">{config.broadcast || 'NEURAL_SYSTEMS_ONLINE'}</span>
-            <StatusBadge label={config.maintenance_mode ? 'Maintenance' : 'Realtime'} tone={topStatusTone} />
+          <div className="ribbon-status" style={{ gap: '8px' }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>GHOST_SHELL</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>/ Neural Core</span>
           </div>
           <div className="ribbon-meta">
-            <span className="mono">Archive {scripts.length}</span>
-            <span className="mono">Live {deployedCount}</span>
+            {isAdmin && <span className="signal-chip success">Admin Active</span>}
           </div>
         </div>
+
         <AnimatePresence>
           {notice && (
             <motion.div
               className={`notice-banner ${notice.type || 'info'}`}
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              exit={{ opacity: 0, y: -20 }}
+              style={{ position: 'absolute', top: '64px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, borderRadius: '8px' }}
             >
               {notice.text}
             </motion.div>
@@ -685,94 +666,90 @@ function App() {
 
         <AnimatePresence mode="wait">
           {activeTab === 'navigator' && (
-            <motion.div key="nav" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="chat-window">
-              <div className="chat-header" style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div className="logo-box" style={{ width: '40px', height: '40px', fontSize: '1.2rem', borderRadius: '12px' }}>S</div>
-                  <div>
-                    <h2 style={{ fontSize: '1.1rem', fontWeight: '900', margin: 0 }}>Neural Assistant</h2>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', margin: 0, marginTop: '2px' }}>Expert AI companion</p>
-                  </div>
-                </div>
-              </div>
-              <div className="chat-feed custom-scrollbar">
-                {messages.length === 1 && !isChatLoading && (
-                  <div className="prompt-grid">
-                    {quickPrompts.map((item) => (
-                      <button
-                        key={item.title}
-                        className="prompt-card glass-dark"
-                        onClick={() => {
-                          setSelectedLanguage(item.language);
-                          setUserInput(item.prompt);
-                        }}
-                      >
-                        <div className="prompt-card-top">
-                           <StatusBadge label={item.language.toUpperCase()} tone="info" />
-                           <ChevronRight size={16} />
+            <motion.div key="nav" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="chat-container custom-scrollbar">
+              <div className="chat-content">
+                {messages.length <= 1 && !isChatLoading && (
+                  <div className="welcome-screen slide-up">
+                    <div className="welcome-logo">G</div>
+                    <h2 className="welcome-title">How can I help you today?</h2>
+                    
+                    <div className="prompt-suggestions">
+                      {quickPrompts.map((item) => (
+                        <div
+                          key={item.title}
+                          className="suggestion-card"
+                          onClick={() => {
+                            setSelectedLanguage(item.language);
+                            setUserInput(item.prompt);
+                          }}
+                        >
+                          <strong>{item.title}</strong>
+                          <p>{item.prompt}</p>
                         </div>
-                        <strong>{item.title}</strong>
-                        <p>{item.prompt}</p>
-                      </button>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )}
-                {messages.map(msg => (
-                  <motion.div key={msg.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`msg ${msg.role === 'user' ? 'msg-user' : 'msg-bot'}`} style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', maxWidth: '100%', marginBottom: '40px' }}>
-                    <div className={`message-avatar ${msg.role === 'user' ? 'user' : 'bot'}`} style={{ 
-                      padding: '12px', 
-                      borderRadius: '16px', 
-                      background: msg.role === 'user' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)', 
-                      border: `1px solid ${msg.role === 'user' ? 'rgba(59,130,246,0.2)' : 'rgba(245,158,11,0.2)'}`,
-                      color: msg.role === 'user' ? 'var(--primary)' : 'var(--secondary)',
-                      boxShadow: `0 0 20px ${msg.role === 'user' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)'}`,
-                      flexShrink: 0 
-                    }}>
-                      {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
+
+                {messages.map((msg, idx) => (
+                  <div key={msg.id} className={`message-row ${msg.role} ${idx === messages.length - 1 ? 'slide-up' : ''}`}>
+                    <div className="message-wrapper">
+                      <div className={`avatar ${msg.role}`}>
+                        {msg.role === 'user' ? <User size={18} /> : <Sparkles size={18} />}
+                      </div>
+                      <div className="message-text">
+                        <MarkdownContent content={msg.text} />
+                      </div>
                     </div>
-                    <div className="glass-premium" style={{ 
-                      padding: '24px 32px', 
-                      borderRadius: '32px', 
-                      borderTopLeftRadius: msg.role === 'bot' ? '4px' : '32px',
-                      borderTopRightRadius: msg.role === 'user' ? '4px' : '32px',
-                      flex: 1, 
-                      color: '#fff', 
-                      fontSize: '1rem', 
-                      lineHeight: '1.7',
-                      boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-                      maxWidth: '85%'
-                    }}>
-                      <MarkdownContent content={msg.text} />
-                    </div>
-                  </motion.div>
+                  </div>
                 ))}
-                {isChatLoading && <div className="loading-row" style={{ display: 'flex', gap: '8px', padding: '12px 24px' }}><div className="status-dot"/><div className="status-dot"/><div className="status-dot"/></div>}
-                <div ref={chatEndRef} />
+                
+                {isChatLoading && (
+                  <div className="message-row bot">
+                    <div className="message-wrapper">
+                      <div className="avatar bot"><RefreshCcw size={18} className="spin" /></div>
+                      <div className="message-text">
+                        <div style={{ display: 'flex', gap: '4px', padding: '8px 0' }}>
+                          <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1 }} style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
+                          <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
+                          <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} style={{ height: 20 }} />
               </div>
-              <div className="input-matrix">
-                <div className="composer-shell">
+
+              <div className="input-area">
+                <div className="input-wrapper">
+                  <PlusCircle size={20} className="text-dim" style={{ cursor: 'pointer' }} />
                   <textarea 
                     value={userInput} 
-                    onChange={e => setUserInput(e.target.value)} 
+                    onChange={e => {
+                      setUserInput(e.target.value);
+                      e.target.style.height = 'auto';
+                      e.target.style.height = e.target.scrollHeight + 'px';
+                    }} 
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         handleChatSubmit();
                       }
                     }} 
-                    placeholder="State your neural objective..." 
-                    className="composer-input"
+                    placeholder="Message GHOST_SHELL..." 
+                    className="chat-input"
                     rows={1}
-                    style={{ height: 'auto' }}
                   />
-                  <button onClick={() => handleChatSubmit()} className="composer-send" disabled={isChatLoading || !userInput.trim()}>
-                    {isChatLoading ? <RefreshCcw size={20} className="spin" /> : <Zap size={20} fill="currentColor" />}
+                  <button 
+                    onClick={() => handleChatSubmit()} 
+                    className="send-btn" 
+                    disabled={isChatLoading || !userInput.trim()}
+                  >
+                    <ArrowUpCircle size={24} />
                   </button>
                 </div>
-                <div className="composer-footer">
-                  <span className="composer-caption">Shift + Enter for new line</span>
-                  <StatusBadge label={isChatLoading ? 'Thinking' : 'Ready'} tone={isChatLoading ? 'warning' : 'success'} />
-                </div>
+                <p className="footer-text">GHOST_SHELL can make mistakes. Check important info.</p>
               </div>
             </motion.div>
           )}
