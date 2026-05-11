@@ -3,7 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - initial-push # The current branch name I see in git status
+      - main
+      - initial-push
   workflow_dispatch:
 
 permissions:
