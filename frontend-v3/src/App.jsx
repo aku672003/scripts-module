@@ -65,6 +65,8 @@ function App() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [forgeStatus, setForgeStatus] = useState('');
   const [forgeProgress, setForgeProgress] = useState(0);
+  const [isEditingClasses, setIsEditingClasses] = useState(false);
+  const [editedClassesText, setEditedClassesText] = useState('');
 
   const chatEndRef = useRef(null);
   const termEndRef = useRef(null);
@@ -339,13 +341,16 @@ function App() {
     }
 
     const fileName = file.name.toLowerCase();
-    let detectedClasses = ["object", "anomaly", "pattern"];
+    let detectedClasses = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light"];
     if (fileName.includes('traffic') || fileName.includes('road')) {
-      detectedClasses = ["car", "truck", "traffic_light", "pedestrian", "sign"];
+      detectedClasses = ["car", "truck", "traffic_light", "pedestrian", "sign", "bus", "motorcycle", "bicycle", "lane_marking", "pothole"];
     } else if (fileName.includes('face') || fileName.includes('person')) {
-      detectedClasses = ["face", "eyes", "mouth", "mask"];
+      detectedClasses = ["face", "eyes", "mouth", "mask", "glasses", "head", "person"];
     } else if (fileName.includes('safety') || fileName.includes('ppe')) {
-      detectedClasses = ["helmet", "vest", "gloves", "person"];
+      detectedClasses = ["helmet", "vest", "gloves", "person", "boots", "glasses", "harness"];
+    } else if (fileName.includes('best') || fileName.includes('last') || fileName.includes('yolo')) {
+      // Common COCO + Industrial defaults
+      detectedClasses = ["person", "vehicle", "helmet", "vest", "tool", "hazard", "box", "pallet", "forklift", "container"];
     }
 
     setForgedModelData({
@@ -359,6 +364,7 @@ function App() {
       classes: detectedClasses,
       version: "2.1.0"
     });
+    setEditedClassesText(detectedClasses.join(', '));
     
     showNotice('Neural analysis complete.', 'success');
     setModelForging(false);
@@ -909,13 +915,37 @@ function App() {
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '16px' }}>
-                        <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)', display: 'block', marginBottom: '12px' }}>DATA.YAML SPECIFICATION</span>
-                        <pre className="mono" style={{ fontSize: '0.75rem', color: '#7ec8a0', lineHeight: '1.5' }}>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>DATA.YAML SPECIFICATION</span>
+                          <button 
+                            onClick={() => setIsEditingClasses(!isEditingClasses)} 
+                            className="btn-micro" 
+                            style={{ fontSize: '0.6rem' }}
+                          >
+                            {isEditingClasses ? 'PREVIEW YAML' : 'EDIT CLASSES'}
+                          </button>
+                        </div>
+                        
+                        {isEditingClasses ? (
+                          <textarea 
+                            value={editedClassesText}
+                            onChange={e => {
+                              setEditedClassesText(e.target.value);
+                              const newClasses = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                              setForgedModelData({...forgedModelData, classes: newClasses});
+                            }}
+                            className="mono custom-scrollbar"
+                            style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--surface-border)', color: '#fff', fontSize: '0.75rem', padding: '12px', borderRadius: '4px', resize: 'none', minHeight: '120px' }}
+                            placeholder="Enter classes separated by commas..."
+                          />
+                        ) : (
+                          <pre className="mono custom-scrollbar" style={{ flex: 1, fontSize: '0.75rem', color: '#7ec8a0', lineHeight: '1.5', overflowY: 'auto', maxHeight: '200px' }}>
 {`names:
 ${(forgedModelData.classes || []).map((c, i) => `  ${i}: ${c}`).join('\n')}
 nc: ${(forgedModelData.classes || []).length}`}
-                        </pre>
+                          </pre>
+                        )}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
