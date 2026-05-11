@@ -541,22 +541,22 @@ function App() {
   );
 
   const SectionHero = ({ icon, eyebrow, title, description, stats = [], action = null }) => (
-    <div className="section-hero" style={{ background: 'rgba(255,255,255,0.02)', padding: '32px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--surface-border)', marginBottom: '32px' }}>
+    <div className="section-hero" style={{ padding: '24px 0', borderBottom: '1px solid var(--surface-border)', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
       <div className="section-copy">
-        <div className="section-eyebrow" style={{ color: 'var(--primary)', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '999px', fontSize: '0.7rem', fontWeight: '800', marginBottom: '16px' }}>
+        <div className="section-eyebrow" style={{ color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: '600', marginBottom: '8px' }}>
           {icon}
-          <span>{eyebrow}</span>
+          <span>{eyebrow.toUpperCase()}</span>
         </div>
-        <h2 className="section-title" style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '12px', background: 'linear-gradient(to bottom, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{title}</h2>
-        {description ? <p className="section-description" style={{ color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: '1.6' }}>{description}</p> : null}
+        <h2 className="section-title" style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '8px', color: '#fff' }}>{title}</h2>
+        {description ? <p className="section-description" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', maxWidth: '600px' }}>{description}</p> : null}
       </div>
-      <div className="section-hero-side" style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-end' }}>
+      <div className="section-hero-side" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
         {stats.length > 0 ? (
-          <div className="section-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '12px' }}>
+          <div className="section-stat-grid" style={{ display: 'flex', gap: '16px' }}>
             {stats.map((stat) => (
-              <div key={stat.label} className="section-stat" style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <span className="section-stat-label" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '4px' }}>{stat.label}</span>
-                <strong style={{ fontSize: '1.2rem', fontWeight: '800' }}>{stat.value}</strong>
+              <div key={stat.label} className="section-stat" style={{ textAlign: 'right' }}>
+                <span className="section-stat-label" style={{ fontSize: '0.65rem', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block' }}>{stat.label}</span>
+                <strong style={{ fontSize: '1rem', fontWeight: '700' }}>{stat.value}</strong>
               </div>
             ))}
           </div>
@@ -819,23 +819,21 @@ function App() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
                     onClick={() => setInspectDeployment(dep)} 
-                    className="glass-premium protocol-card" 
-                    style={{ padding: '32px', borderRadius: 'var(--radius-lg)', cursor: 'pointer', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}
+                    className="card" 
+                    style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden' }}
                   >
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: dep.status === 'DEPLOYED' ? 'var(--primary)' : 'var(--secondary)' }} />
-                    <div className="protocol-card-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Hash size={14} color="var(--text-dim)" /><span className="mono" style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: '700' }}>{dep.language.toUpperCase()}</span></div>
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '3px', height: '100%', background: dep.status === 'DEPLOYED' ? '#10a37f' : '#f59e0b' }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Hash size={12} color="var(--text-dim)" /><span className="mono" style={{ color: 'var(--text-secondary)', fontSize: '0.65rem' }}>{dep.language.toUpperCase()}</span></div>
                       <StatusBadge label={dep.status} tone={dep.status === 'DEPLOYED' ? 'success' : 'warning'} />
                     </div>
-                    <h3 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '12px', letterSpacing: '-0.01em' }}>{dep.name}</h3>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '32px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.6' }}>{dep.description}</p>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '8px' }}>{dep.name}</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.5' }}>{dep.description}</p>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
-                      <div style={{ display: 'flex', gap: '12px' }}>
-                        <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>BY: {dep.author || 'ROOT'}</span>
-                      </div>
-                      <div className="protocol-actions" style={{ display: 'flex', gap: '10px' }} onClick={e => e.stopPropagation()}>
-                        <button onClick={() => setInspectDeployment(dep)} className="btn-micro" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>INSPECT</button>
-                        {dep.status === 'STAGED' && isAdmin && <button onClick={() => deployToDisk(dep.name)} className="btn-micro" style={{ background: 'var(--primary)', color: '#000', border: 'none' }}>ACTIVATE</button>}
+                      <span className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)' }}>{dep.author || 'ROOT'}</span>
+                      <div style={{ display: 'flex', gap: '8px' }} onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setInspectDeployment(dep)} className="btn-micro">INSPECT</button>
+                        {dep.status === 'STAGED' && isAdmin && <button onClick={() => deployToDisk(dep.name)} className="btn-micro" style={{ background: '#fff', color: '#000' }}>ACTIVATE</button>}
                       </div>
                     </div>
                   </motion.div>
@@ -968,31 +966,29 @@ nc: ${(forgedModelData.classes || []).length}`}
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: idx * 0.04 }}
-                      className="glass-premium protocol-card" 
-                      style={{ padding: '32px', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}
+                      className="card" 
+                      style={{ display: 'flex', flexDirection: 'column' }}
                     >
-                      <div className="protocol-card-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Command size={14} color="var(--text-dim)" /><span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '700' }}>VAULT_ID: {script.slug}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Command size={12} color="var(--text-dim)" /><span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>{script.slug}</span></div>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                          <button onClick={() => setInspectDeployment(script)} className="btn-micro" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>VIEW</button>
-                          {isAdmin && <button onClick={() => deleteScript(script.name)} className="btn-micro danger" style={{ borderColor: 'rgba(239,68,68,0.2)' }}><Trash2 size={14} /></button>}
+                          <button onClick={() => setInspectDeployment(script)} className="btn-micro">VIEW</button>
+                          {isAdmin && <button onClick={() => deleteScript(script.name)} className="btn-micro danger"><Trash2 size={12} /></button>}
                         </div>
                       </div>
-                      <h3 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '12px' }}>{script.name}</h3>
-                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '24px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.6' }}>{script.description}</p>
-                      <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '8px' }}>{script.name}</h3>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.5' }}>{script.description}</p>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
                         <StatusBadge label={script.language.toUpperCase()} tone="neutral" />
-                        <StatusBadge label={`${(script.features || []).length} Nodes`} tone="info" />
                       </div>
                       <button 
                         onClick={() => {
                           setDeployForm(prev => ({ ...prev, name: script.name, code: script.code, language: script.language }));
                           setActiveTab('deploy');
                         }}
-                        className="btn-premium" 
-                        style={{ width: '100%', padding: '16px', borderRadius: 'var(--radius-md)', marginTop: 'auto', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                        style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', marginTop: 'auto', background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', color: '#fff', fontSize: '0.8rem', cursor: 'pointer' }}
                       >
-                        STAGE_PROTOCOL
+                        STAGE PROTOCOL
                       </button>
                     </motion.div>
                   ))}
