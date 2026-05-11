@@ -179,10 +179,20 @@ function App() {
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        const res = await fetch('/healthz');
+        const res = await fetch('http://localhost:8006/healthz');
         setIsBackendOnline(res.ok);
       } catch {
-        setIsBackendOnline(false);
+        try {
+          const res2 = await fetch('/healthz');
+          setIsBackendOnline(res2.ok);
+        } catch {
+          // If we are on GitHub Pages, we are 'Web-Active'
+          if (window.location.hostname.includes('github.io')) {
+            setIsBackendOnline('webshell');
+          } else {
+            setIsBackendOnline(false);
+          }
+        }
       }
     };
     checkBackend();
@@ -351,7 +361,8 @@ function App() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/forge', {
+      const url = isBackendOnline ? (window.location.hostname === 'localhost' ? '/api/forge' : 'http://localhost:8006/api/forge') : '/api/forge';
+      const response = await fetch(url, {
         method: 'POST',
         body: formData
       });
@@ -694,8 +705,16 @@ function App() {
           </div>
           <div style={{ padding: '4px 12px', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.65rem' }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: isBackendOnline ? '#10a37f' : '#ff5f56', boxShadow: isBackendOnline ? '0 0 8px #10a37f' : 'none' }} />
-              <span style={{ color: 'var(--text-dim)' }}>NEURAL ENGINE: {isBackendOnline ? 'ONLINE' : 'OFFLINE'}</span>
+              <div style={{ 
+                width: 6, 
+                height: 6, 
+                borderRadius: '50%', 
+                background: isBackendOnline === true ? '#10a37f' : isBackendOnline === 'webshell' ? '#f1c40f' : '#ff5f56', 
+                boxShadow: isBackendOnline === true ? '0 0 8px #10a37f' : isBackendOnline === 'webshell' ? '0 0 8px #f1c40f' : 'none' 
+              }} />
+              <span style={{ color: 'var(--text-dim)' }}>
+                NEURAL ENGINE: {isBackendOnline === true ? 'ONLINE' : isBackendOnline === 'webshell' ? 'WEBSHELL_ACTIVE' : 'OFFLINE'}
+              </span>
             </div>
           </div>
           <div className="nav-item" onClick={() => setActiveTab('library')}>

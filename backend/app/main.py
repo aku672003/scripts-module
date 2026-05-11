@@ -22,7 +22,7 @@ app.add_middleware(GZipMiddleware, minimum_size=512)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:1818", "http://65.1.191.126", "http://65.1.191.126:1818"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Admin-Token"],
