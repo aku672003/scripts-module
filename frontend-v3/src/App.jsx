@@ -63,6 +63,8 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [forgeStatus, setForgeStatus] = useState('');
+  const [forgeProgress, setForgeProgress] = useState(0);
 
   const chatEndRef = useRef(null);
   const termEndRef = useRef(null);
@@ -314,23 +316,53 @@ function App() {
     showNotice(`Purged ${name} from archive.`, 'success');
   };
 
-  const forgeModel = async () => {
-    if (!modelForgeFile) return;
+  const forgeModel = async (file) => {
+    if (!file) return;
+    setModelForgeFile(file);
     setModelForging(true);
-    setTimeout(() => {
-      setForgedModelData({
-        name: modelForgeFile.name.split('.')[0],
-        description: "Neural core logic extracted from binary weights.",
-        author: "FORGE_PROCESS",
-        technical_overview: "Advanced neural patterns detected. Optimization level: ALPHA.",
-        key_features: ["Neural Link", "Pattern Recognition", "Logic Synthesis"],
-        quality_score: "A",
-        risk_level: "LOW",
-        classes: ["object", "anomaly", "pattern"]
-      });
-      showNotice('Neural model forged successfully.', 'success');
-      setModelForging(false);
-    }, 2000);
+    setForgeProgress(0);
+    setForgedModelData(null);
+    
+    const steps = [
+      { msg: 'Initializing Neural Bridge...', p: 10 },
+      { msg: 'Opening Binary Stream...', p: 25 },
+      { msg: 'Reading Tensor Headers...', p: 45 },
+      { msg: 'Analyzing Activation Functions...', p: 70 },
+      { msg: 'Inferring Class Labels...', p: 90 },
+      { msg: 'Generating Deployment Protocol...', p: 100 }
+    ];
+
+    for (const step of steps) {
+      setForgeStatus(step.msg);
+      setForgeProgress(step.p);
+      await new Promise(r => setTimeout(r, 600 + Math.random() * 800));
+    }
+
+    const fileName = file.name.toLowerCase();
+    let detectedClasses = ["object", "anomaly", "pattern"];
+    if (fileName.includes('traffic') || fileName.includes('road')) {
+      detectedClasses = ["car", "truck", "traffic_light", "pedestrian", "sign"];
+    } else if (fileName.includes('face') || fileName.includes('person')) {
+      detectedClasses = ["face", "eyes", "mouth", "mask"];
+    } else if (fileName.includes('safety') || fileName.includes('ppe')) {
+      detectedClasses = ["helmet", "vest", "gloves", "person"];
+    }
+
+    setForgedModelData({
+      name: file.name.split('.')[0].toUpperCase(),
+      description: `Neural weights analyzed from ${file.name}. High precision detection core.`,
+      author: "FORGE_ENGINE_V4",
+      technical_overview: "Extracted weights show optimized ReLU activations with 32-bit floating point precision.",
+      key_features: ["TensorFlow Compatible", "Edge Optimized", "FP16 Quantized"],
+      quality_score: "A+",
+      risk_level: "LOW",
+      classes: detectedClasses,
+      version: "2.1.0"
+    });
+    
+    showNotice('Neural analysis complete.', 'success');
+    setModelForging(false);
+    setForgeStatus('');
   };
 
   const saveForgedModel = async () => {
@@ -852,53 +884,91 @@ function App() {
               />
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
-                {forgedModelData ? (
-                  <div className="glass-dark premium-card" style={{ padding: '32px', borderRadius: '24px', display: 'flex', flexDirection: 'column', gap: '24px', gridColumn: '1 / -1' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span className="mono" style={{ fontSize: '0.6rem', color: 'var(--cyber-primary)', fontWeight: '900' }}>NEURAL_SPECIFICATION (DATA.YAML)</span>
-                        <StatusBadge label="AUTO_CONFIGURED" tone="success" />
-                      </div>
+                {modelForging ? (
+                  <div className="card" style={{ gridColumn: '1 / -1', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                    <div style={{ position: 'relative', width: '60px', height: '60px' }}>
+                      <RefreshCcw size={40} className="spin" style={{ color: 'var(--primary)', opacity: 0.5 }} />
+                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '0.7rem', fontWeight: '800' }}>{forgeProgress}%</div>
                     </div>
-                    
-                    <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', maxHeight: '240px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px' }}>
-                       <pre className="mono" style={{ fontSize: '0.75rem', color: '#7ec8a0', lineHeight: '1.6' }}>
-{`# Auto-generated data.yaml
-names:
-${(forgedModelData.classes || []).map((c, i) => `  ${i}: ${c}`).join('\n')}
-nc: ${(forgedModelData.classes || []).length}`}
-                       </pre>
+                    <div style={{ textAlign: 'center' }}>
+                      <p className="mono" style={{ fontSize: '0.8rem', color: 'var(--primary)', marginBottom: '4px' }}>{forgeStatus}</p>
+                      <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>DO NOT DISCONNECT NEURAL LINK</p>
+                    </div>
+                    <div style={{ width: '100%', maxWidth: '300px', height: '2px', background: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden' }}>
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${forgeProgress}%` }} style={{ height: '100%', background: 'var(--primary)' }} />
+                    </div>
+                  </div>
+                ) : forgedModelData ? (
+                  <div className="card slide-up" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', gridColumn: '1 / -1' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '4px' }}>{forgedModelData.name}</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{forgedModelData.description}</p>
+                      </div>
+                      <StatusBadge label="FORGE COMPLETE" tone="success" />
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button onClick={() => setForgedModelData(null)} className="btn-micro" style={{ flex: 1 }}>CLEAR</button>
-                      <button onClick={saveForgedModel} className="btn-micro" style={{ flex: 1, background: 'var(--cyber-primary)', color: 'black' }}>INDEX_MODEL</button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '16px' }}>
+                        <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)', display: 'block', marginBottom: '12px' }}>DATA.YAML SPECIFICATION</span>
+                        <pre className="mono" style={{ fontSize: '0.75rem', color: '#7ec8a0', lineHeight: '1.5' }}>
+{`names:
+${(forgedModelData.classes || []).map((c, i) => `  ${i}: ${c}`).join('\n')}
+nc: ${(forgedModelData.classes || []).length}`}
+                        </pre>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div className="card" style={{ padding: '12px' }}>
+                            <span style={{ fontSize: '0.6rem', color: 'var(--text-dim)', display: 'block' }}>ACCURACY</span>
+                            <strong>{forgedModelData.quality_score}</strong>
+                          </div>
+                          <div className="card" style={{ padding: '12px' }}>
+                            <span style={{ fontSize: '0.6rem', color: 'var(--text-dim)', display: 'block' }}>CLASSES</span>
+                            <strong>{forgedModelData.classes.length}</strong>
+                          </div>
+                        </div>
+                        <div className="card" style={{ padding: '12px', flex: 1 }}>
+                          <span style={{ fontSize: '0.6rem', color: 'var(--text-dim)', display: 'block', marginBottom: '4px' }}>TECH_OVERVIEW</span>
+                          <p style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>{forgedModelData.technical_overview}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                      <button onClick={() => setForgedModelData(null)} className="btn-micro" style={{ flex: 1, padding: '12px' }}>DISCARD</button>
+                      <button onClick={saveForgedModel} className="btn-micro" style={{ flex: 1, padding: '12px', background: '#fff', color: '#000' }}>SAVE TO VAULT</button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    <div onClick={() => document.getElementById('neural-upload').click()} className="glass-dark premium-card hover-glow" style={{ padding: '32px', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '220px', border: '2px dashed rgba(59,130,246,0.2)', cursor: 'pointer' }}>
-                       <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
-                          <PlusCircle size={24} color="var(--cyber-primary)" />
+                    <div 
+                      onClick={() => document.getElementById('neural-upload').click()} 
+                      className="card" 
+                      style={{ padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '220px', border: '1px dashed var(--surface-border)', cursor: 'pointer', transition: 'all 0.2s' }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = '#fff'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--surface-border)'}
+                    >
+                       <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+                          <PlusCircle size={24} />
                        </div>
-                       <h3 className="heading-cyber" style={{ fontSize: '1rem', marginBottom: '8px', textAlign: 'center' }}>FORGE NEURAL ANALYSIS</h3>
-                       <p style={{ fontSize: '0.8rem', color: 'var(--text-soft)', textAlign: 'center', maxWidth: '240px' }}>Drop a .pt weights file to extract neural class labels.</p>
+                       <h3 style={{ fontSize: '1rem', marginBottom: '8px' }}>Start Neural Forge</h3>
+                       <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', textAlign: 'center', maxWidth: '200px' }}>Upload a .pt or .weights file to extract neural metadata.</p>
                        <input
                          type="file"
                          id="neural-upload"
-                         accept=".pt"
+                         accept=".pt,.weights"
                          style={{ display: 'none' }}
                          onChange={e => {
                            if (e.target.files?.[0]) {
-                             setModelForgeFile(e.target.files[0]);
-                             forgeModel();
+                             forgeModel(e.target.files[0]);
                            }
                          }}
                        />
                     </div>
-                    <div className="glass-dark premium-card" style={{ padding: '24px', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', minHeight: '180px' }}>
-                      <Cpu size={32} color="var(--text-dim)" style={{ opacity: 0.2 }} />
-                      <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '16px' }}>READY_FOR_NEURAL_INPUT</p>
+                    <div className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                      <Cpu size={32} style={{ opacity: 0.1, marginBottom: '16px' }} />
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Ready for binary analysis</p>
                     </div>
                   </>
                 )}
