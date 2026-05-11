@@ -63,6 +63,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [isBackendOnline, setIsBackendOnline] = useState(false);
   const [forgeStatus, setForgeStatus] = useState('');
   const [forgeProgress, setForgeProgress] = useState(0);
   const [isEditingClasses, setIsEditingClasses] = useState(false);
@@ -173,6 +174,20 @@ function App() {
   const fetchNeuralModels = useCallback(() => {
     const data = getLocalStorageData('neural_models', []);
     setNeuralModels(data);
+  }, []);
+
+  useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        const res = await fetch('/healthz');
+        setIsBackendOnline(res.ok);
+      } catch {
+        setIsBackendOnline(false);
+      }
+    };
+    checkBackend();
+    const interval = setInterval(checkBackend, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -676,6 +691,12 @@ function App() {
           <div className="nav-item active" onClick={() => setActiveTab('navigator')}>
             <MessageSquare size={18} />
             Assistant
+          </div>
+          <div style={{ padding: '4px 12px', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.65rem' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: isBackendOnline ? '#10a37f' : '#ff5f56', boxShadow: isBackendOnline ? '0 0 8px #10a37f' : 'none' }} />
+              <span style={{ color: 'var(--text-dim)' }}>NEURAL ENGINE: {isBackendOnline ? 'ONLINE' : 'OFFLINE'}</span>
+            </div>
           </div>
           <div className="nav-item" onClick={() => setActiveTab('library')}>
             <Archive size={18} />
