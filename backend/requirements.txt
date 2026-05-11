@@ -5,3 +5,7 @@ pydantic
 python-multipart
 requests
 psutil
+torch
+ultralytics
+onnx
+PyYAML

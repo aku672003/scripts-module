@@ -1,61 +1,102 @@
 import os
-import yaml
-import time
 import sys
+import time
 
-# =========================
-# ⚙️ CONFIG
-# =========================
-DATASET_PATH = "dataset"
-OUTPUT_FILE = "data.yaml"
+# Attempt to import torch for real inspection
+try:
+    import torch
+except ImportError:
+    torch = None
 
-def load_classes(dataset_path):
-    class_file = os.path.join(dataset_path, "classes.txt")
-    if not os.path.exists(class_file):
-        # For simulation/demo purposes, we'll look in the root if not in /dataset
-        class_file = "classes.txt" if os.path.exists("classes.txt") else class_file
-        if not os.path.exists(class_file):
-            raise FileNotFoundError("classes.txt not found")
-
-    with open(class_file, "r") as f:
-        classes = [line.strip() for line in f.readlines() if line.strip()]
-    return classes
-
-def generate_yaml(dataset_path):
-    print(f"📂 [INFO] Scanning dataset path: {dataset_path}")
+def extract_classes(model_path):
+    print(f"🔍 Loading model: {model_path}")
     time.sleep(0.5)
-    classes = load_classes(dataset_path)
-    print(f"🧠 [INFO] Classes identified: {', '.join(classes)}")
-    
-    data = {
-        "path": os.path.abspath(dataset_path),
-        "train": "images/train",
-        "val": "images/val",
-        "names": classes,
-        "nc": len(classes)
-    }
-    return data
 
-def save_yaml(data, output_file):
-    with open(output_file, "w") as f:
-        yaml.dump(data, f, sort_keys=False)
+    # ---------------------------
+    # Try Ultralytics YOLO
+    # ---------------------------
+    try:
+        from ultralytics import YOLO
+        model = YOLO(model_path)
+        if hasattr(model, "names"):
+            print("\n✅ Detected: Ultralytics YOLO")
+            return model.names
+    except Exception:
+        pass
+
+    # ---------------------------
+    # Try PyTorch (.pt/.pth)
+    # ---------------------------
+    try:
+        if torch is None:
+            raise ImportError("torch not installed")
+            
+        model = torch.load(model_path, map_location="cpu")
+
+        # Case 1: model object
+        if hasattr(model, "names"):
+            print("\n✅ Found names in model.names")
+            return model.names
+
+        if hasattr(model, "classes"):
+            print("\n✅ Found names in model.classes")
+            return model.classes
+
+        # Case 2: checkpoint dict
+        if isinstance(model, dict):
+            if "names" in model:
+                print("\n✅ Found names in checkpoint['names']")
+                return model["names"]
+
+            if "model" in model and hasattr(model["model"], "names"):
+                print("\n✅ Found names in checkpoint['model'].names")
+                return model["model"].names
+
+    except Exception as e:
+        print(f"⚠️ PyTorch load failed: {str(e)}")
+
+    # ---------------------------
+    # Try ONNX metadata
+    # ---------------------------
+    try:
+        import onnx
+
+        model = onnx.load(model_path)
+        metadata = {p.key: p.value for p in model.metadata_props}
+
+        if "names" in metadata:
+            print("\n✅ Found names in ONNX metadata")
+            return eval(metadata["names"])
+
+    except Exception:
+        pass
+
+    # ---------------------------
+    # Fallback
+    # ---------------------------
+    print("\n❌ Could not extract class names.")
+    print("👉 Model likely does not store labels.")
+    return None
 
 if __name__ == "__main__":
-    try:
-        # If a file is passed as argument, we treat its directory as the dataset path
-        target_path = sys.argv[1] if len(sys.argv) > 1 else DATASET_PATH
+    MODEL_PATH = sys.argv[1] if len(sys.argv) > 1 else "best.pt"
+
+    classes = extract_classes(MODEL_PATH)
+
+    if classes:
+        print("\n📊 Classes Found:")
+        # Format for frontend parsing
+        class_list = []
+        if isinstance(classes, dict):
+            for k, v in classes.items():
+                print(f"{k}: {v}")
+                class_list.append(str(v))
+        else:
+            for i, name in enumerate(classes):
+                print(f"{i}: {name}")
+                class_list.append(str(name))
         
-        print(f"🚀 [SYSTEM] Initializing Dataset Forge Engine...")
-        time.sleep(0.6)
-        
-        yaml_data = generate_yaml(target_path)
-        save_yaml(yaml_data, OUTPUT_FILE)
-        
+        # Secret marker for the backend service to grab the final list easily
         print("--- RESULT_START ---")
-        print(",".join(yaml_data["names"]))
+        print(",".join(class_list))
         print("--- RESULT_END ---")
-        
-        time.sleep(0.4)
-        print("✅ data.yaml generated successfully!")
-    except Exception as e:
-        print(f"❌ [ERROR] {str(e)}")
