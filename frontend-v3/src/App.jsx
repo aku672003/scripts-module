@@ -11,11 +11,11 @@ import {
   TrendingUp, BarChart3, Activity as ActivityIcon, ShieldEllipsis, AlertTriangle,
   Download, Share2, Filter, Gauge, Fingerprint, RefreshCcw, Microscope,
   Bug, ShieldX, Scan, EyeOff, FlaskConical, Binary, 
-  Sliders, LayoutGrid, Network, Key, Bot
+  Sliders, LayoutGrid, Network, Key, Bot, Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_BASE = '/api/v1';
+const API_BASE = window.location.pathname.includes('/1818/') ? '/1818/api/v1' : 'api/v1';
 const FALLBACK_LANGUAGES = ["python", "bash", "javascript", "typescript", "c++", "rust", "go", "ruby", "php", "java", "sql"];
 const NOTICE_TIMEOUT_MS = 4500;
 
@@ -61,6 +61,8 @@ function App() {
   const [modelForgeFile, setModelForgeFile] = useState(null);
   const [modelForging, setModelForging] = useState(false);
   const [forgedModelData, setForgedModelData] = useState(null);
+  const [neuralModels, setNeuralModels] = useState([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const chatEndRef = useRef(null);
   const termEndRef = useRef(null);
@@ -92,14 +94,12 @@ function App() {
     return headers;
   };
 
-  const fetchModels = useCallback(async () => {
+  const fetchModels = useCallback(async (signal) => {
     try {
-      const res = await fetch(`${API_BASE}/models`);
+      const res = await fetch(`${API_BASE}/models`, { signal });
       const data = await readResponseJson(res);
       if (res.ok) setAiModels(data.models || []);
-    } catch (err) {
-      console.error("Failed to fetch models", err);
-    }
+    } catch (err) { if (err.name !== 'AbortError') console.error("Failed to fetch models", err); }
   }, []);
 
   const forgeModel = async () => {
@@ -107,6 +107,22 @@ function App() {
     setModelForging(true);
     setForgedModelData(null);
     try {
+      // 1. Upload the file first
+      const formData = new FormData();
+      formData.append('file', modelForgeFile);
+      
+      const uploadRes = await fetch(`${API_BASE}/models/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!uploadRes.ok) {
+        showNotice('Failed to upload neural weights.', 'error');
+        setModelForging(false);
+        return;
+      }
+
+      // 2. Trigger analysis
       const res = await fetch(`${API_BASE}/models/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -126,29 +142,42 @@ function App() {
     }
   };
 
+  const fetchNeuralModels = useCallback(async (signal) => {
+    try {
+      const res = await fetch(`${API_BASE}/neural-models`, { signal });
+      const data = await readResponseJson(res);
+      if (res.ok) setNeuralModels(data.models || []);
+    } catch (err) { if (err.name !== 'AbortError') console.error('Neural fetch failure', err); }
+  }, []);
   const saveForgedModel = async () => {
     if (!forgedModelData) return;
+    setLoading(true);
     try {
+      const classesDict = (forgedModelData.classes || []).map((c, i) => `    ${i}: "${c}"`).join(',\n');
       const payload = {
         ...forgedModelData,
-        author: deployForm.author || 'NEURAL_FORGE',
+        code: `NEURAL_CLASSES = {\n${classesDict}\n}\n\n# System-extracted metadata for ${forgedModelData.name}\n# Total classes: ${(forgedModelData.classes || []).length}`,
+        language: 'python'
       };
-      const res = await fetch(`${API_BASE}/scripts`, {
-        method: 'POST',
-        headers: getAdminHeaders(true),
-        body: JSON.stringify(payload)
+      
+      const res = await fetch(`${API_BASE}/neural-models`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload) 
       });
+      
       if (res.ok) {
-        showNotice('Neural protocol indexed to Archive Vault.', 'success');
         setForgedModelData(null);
         setModelForgeFile(null);
-        fetchScripts();
+        fetchNeuralModels();
+        setActiveTab('neural_vault');
+        showNotice('Neural model indexed successfully.', 'success');
       } else {
-        showNotice('Save failed. Indexing collision.', 'error');
+        showNotice('Unable to index neural model.', 'error');
       }
     } catch (err) {
-      showNotice('Critical failure during indexing.', 'error');
-    }
+      showNotice('Communication failure.', 'error');
+    } finally { setLoading(false); }
   };
 
   const readResponseJson = async (response) => {
@@ -184,28 +213,26 @@ function App() {
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => { termEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [terminalOutput]);
 
-  const fetchScripts = useCallback(async () => {
+  const fetchScripts = useCallback(async (signal) => {
     try {
-      const res = await fetch(`${API_BASE}/scripts`);
+      const res = await fetch(`${API_BASE}/scripts`, { signal });
       const data = await readResponseJson(res);
       if (res.ok) setScripts(data.scripts || []);
-    } catch (err) {}
+    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
   }, []);
-  const fetchDeployments = useCallback(async () => {
+  const fetchDeployments = useCallback(async (signal) => {
     try {
-      const res = await fetch(`${API_BASE}/deployments`);
+      const res = await fetch(`${API_BASE}/deployments`, { signal });
       const data = await readResponseJson(res);
       if (res.ok) setDeployments(data.deployments || []);
-    } catch (err) {}
+    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
   }, []);
-  const fetchConfig = useCallback(async () => {
+  const fetchConfig = useCallback(async (signal) => {
     try {
-      const res = await fetch(`${API_BASE}/config`);
+      const res = await fetch(`${API_BASE}/config`, { signal });
       const data = await readResponseJson(res);
       if (res.ok) {
         setConfig(data);
-        
-        // Initialise editable states only ONCE to prevent polling from overwriting user input
         if (!configInitialised.current) {
           setGovLimits({
             chat_limit: data.chat_limit,
@@ -218,37 +245,37 @@ function App() {
           configInitialised.current = true;
         }
       }
-    } catch (err) {}
+    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
   }, []);
-  const fetchLanguages = useCallback(async () => {
+  const fetchLanguages = useCallback(async (signal) => {
     try {
-      const res = await fetch(`${API_BASE}/languages`);
+      const res = await fetch(`${API_BASE}/languages`, { signal });
       const data = await readResponseJson(res);
       if (res.ok && Array.isArray(data.languages) && data.languages.length > 0) {
         setAvailableLanguages(data.languages);
         setSelectedLanguage(current => data.languages.includes(current) ? current : data.languages[0]);
         setDeployForm(current => ({ ...current, language: data.languages.includes(current.language) ? current.language : data.languages[0] }));
       }
-    } catch (err) {}
+    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
   }, []);
-  const fetchHealth = useCallback(async () => {
+  const fetchHealth = useCallback(async (signal) => {
     try {
-      const res = await fetch(`${API_BASE}/admin/system/health`, { headers: getAdminHeaders() });
+      const res = await fetch(`${API_BASE}/admin/system/health`, { headers: getAdminHeaders(), signal });
       if (handleAdminAuthFailure(res)) return;
       const data = await readResponseJson(res);
       if (!res.ok) return;
       setSystemHealth(data);
       setHealthHistory(prev => [...prev.slice(-15), data.cpu_usage]);
-    } catch (err) {}
+    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
   }, []);
-  const fetchActivity = useCallback(async () => {
+  const fetchActivity = useCallback(async (signal) => {
     try {
-      const res = await fetch(`${API_BASE}/admin/activity`, { headers: getAdminHeaders() });
+      const res = await fetch(`${API_BASE}/admin/activity`, { headers: getAdminHeaders(), signal });
       if (handleAdminAuthFailure(res)) return;
       const data = await readResponseJson(res);
       if (!res.ok) return;
       setActivityFeed(data.activity || []);
-    } catch (err) {}
+    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
   }, []);
 
   // One-time mount effect — no dependencies on isAdmin/adminToken to avoid restarts
@@ -263,20 +290,36 @@ function App() {
     const syncLayout = () => setIsCompactLayout(window.innerWidth < 1100);
     syncLayout();
     window.addEventListener('resize', syncLayout);
-    fetchScripts(); fetchDeployments(); fetchConfig(); fetchLanguages(); fetchModels();
-    // Interval uses refs — always sees the current token/admin state
+    
+    // Initial fetch
+    const controller = new AbortController();
+    const { signal } = controller;
+    
+    fetchScripts(signal); 
+    fetchDeployments(signal); 
+    fetchConfig(signal); 
+    fetchLanguages(signal); 
+    fetchModels(signal); 
+    fetchNeuralModels(signal);
+    
     const interval = setInterval(() => {
-      fetchConfig();
-      fetchDeployments();
-      fetchModels();
-      if (isAdminRef.current) { fetchHealth(); fetchActivity(); }
+      fetchConfig(signal);
+      fetchDeployments(signal);
+      fetchModels(signal);
+      if (isAdminRef.current) { 
+        fetchHealth(signal); 
+        fetchActivity(signal); 
+        fetchNeuralModels(signal); 
+      }
     }, 4000);
+
     return () => {
+      controller.abort();
       clearInterval(interval);
       window.removeEventListener('resize', syncLayout);
       if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
     };
-  }, [fetchConfig, fetchScripts, fetchDeployments, fetchModels, fetchHealth, fetchActivity, fetchLanguages]);
+  }, [fetchConfig, fetchScripts, fetchDeployments, fetchModels, fetchHealth, fetchActivity, fetchLanguages, fetchNeuralModels]);
 
   const updateConfig = async (patch) => {
     try {
@@ -424,6 +467,42 @@ function App() {
       showNotice(`Terminated ${name}.`, 'success');
     } catch (err) {
       showNotice(`Unable to terminate ${name}.`, 'error');
+    }
+  };
+
+  const deleteScript = async (name) => {
+    if (!window.confirm(`PURGE_PROTOCOL: Permanently wipe ${name} from Archive Vault?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/scripts/${encodeURIComponent(name)}`, { method: 'DELETE', headers: getAdminHeaders() });
+      if (handleAdminAuthFailure(res)) return;
+      const data = await readResponseJson(res);
+      if (!res.ok) {
+        showNotice(getErrorMessage(data, `Unable to purge ${name}.`), 'error');
+        return;
+      }
+      fetchScripts();
+      showNotice(`Purged ${name} from archive.`, 'success');
+    } catch (err) {
+      showNotice(`Unable to purge ${name}.`, 'error');
+    }
+  };
+
+  const deleteNeuralModel = async (name) => {
+    if (!window.confirm(`PURGE_MODEL: Permanently wipe ${name}?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/neural-models/${encodeURIComponent(name)}`, { 
+        method: 'DELETE', 
+        headers: getAdminHeaders() 
+      });
+      if (handleAdminAuthFailure(res)) return;
+      if (res.ok) {
+        fetchNeuralModels();
+        showNotice(`Purged ${name}.`, 'success');
+      } else {
+        showNotice(`Unable to purge ${name}.`, 'error');
+      }
+    } catch (err) {
+      showNotice(`Communication failure.`, 'error');
     }
   };
 
@@ -622,26 +701,34 @@ function App() {
   ];
 
   const StatusBadge = ({ label, tone = 'neutral' }) => (
-    <span className={`signal-chip ${tone}`}>{label}</span>
+    <span className={`signal-chip ${tone}`} style={{ 
+      padding: '6px 14px', 
+      fontSize: '0.65rem', 
+      fontWeight: '800', 
+      letterSpacing: '0.1em',
+      boxShadow: tone !== 'neutral' ? `0 0 15px hsla(var(--${tone === 'success' ? 'p' : tone === 'warning' ? 's' : 'a'}-h), 100%, 50%, 0.2)` : 'none'
+    }}>
+      {label}
+    </span>
   );
 
   const SectionHero = ({ icon, eyebrow, title, description, stats = [], action = null }) => (
-    <div className="section-hero">
+    <div className="section-hero" style={{ background: 'rgba(255,255,255,0.02)', padding: '32px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--surface-border)', marginBottom: '32px' }}>
       <div className="section-copy">
-        <div className="section-eyebrow">
+        <div className="section-eyebrow" style={{ color: 'var(--primary)', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: '999px', fontSize: '0.7rem', fontWeight: '800', marginBottom: '16px' }}>
           {icon}
           <span>{eyebrow}</span>
         </div>
-        <h2 className="heading-cyber section-title">{title}</h2>
-        {description ? <p className="section-description">{description}</p> : null}
+        <h2 className="section-title" style={{ fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.02em', marginBottom: '12px', background: 'linear-gradient(to bottom, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{title}</h2>
+        {description ? <p className="section-description" style={{ color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: '1.6' }}>{description}</p> : null}
       </div>
-      <div className="section-hero-side">
+      <div className="section-hero-side" style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-end' }}>
         {stats.length > 0 ? (
-          <div className="section-stat-grid">
+          <div className="section-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '12px' }}>
             {stats.map((stat) => (
-              <div key={stat.label} className="section-stat">
-                <span className="section-stat-label">{stat.label}</span>
-                <strong>{stat.value}</strong>
+              <div key={stat.label} className="section-stat" style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <span className="section-stat-label" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '4px' }}>{stat.label}</span>
+                <strong style={{ fontSize: '1.2rem', fontWeight: '800' }}>{stat.value}</strong>
               </div>
             ))}
           </div>
@@ -662,62 +749,89 @@ function App() {
 
   return (
     <div className={`app-shell ${isCompactLayout ? 'compact' : ''}`}>
-      <aside className="sidebar glass premium-shell">
-        <div className="brand-block">
-          <div className="logo-box">S</div>
+      <div className={`mobile-overlay ${isSidebarOpen ? 'active' : ''}`} onClick={() => setIsSidebarOpen(false)} />
+      <aside className={`sidebar glass-premium ${isSidebarOpen ? 'open' : ''}`} style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="brand-block" style={{ marginBottom: '40px' }}>
+          <div className="logo-box" style={{ background: 'linear-gradient(135deg, var(--primary), var(--accent))', color: '#fff', fontSize: '1.8rem' }}>G</div>
           <div className="brand-copy">
-            <h1>SCRIPT_SHELL</h1>
-            <p>Premium script operations deck</p>
+            <h1 style={{ fontSize: '1.2rem', letterSpacing: '0.2em' }}>GHOST_SHELL</h1>
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', letterSpacing: '0.05em' }}>v4.5.2 // NEURAL_CORE</p>
           </div>
         </div>
-        <div className="sidebar-intel glass-dark">
-          <div className="sidebar-intel-row">
+
+        <div className="sidebar-intel glass-premium" style={{ padding: '20px', borderRadius: 'var(--radius-lg)', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '32px' }}>
+          <div className="sidebar-intel-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
             <div>
-              <span className="sidebar-kicker">Broadcast</span>
-              <p>{config.broadcast || 'Neural systems online'}</p>
+              <span className="sidebar-kicker" style={{ color: 'var(--primary)', fontSize: '0.6rem', fontWeight: '800' }}>SYS_PULSE</span>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{config.broadcast || 'Operational'}</p>
             </div>
-            <StatusBadge label={config.maintenance_mode ? 'Lockdown' : 'Open'} tone={topStatusTone} />
+            <StatusBadge label={config.maintenance_mode ? 'Locked' : 'Active'} tone={topStatusTone} />
           </div>
-          <div className="sidebar-metrics">
-            <div className="sidebar-metric">
-              <span>Archive</span>
-              <strong>{scripts.length}</strong>
-            </div>
-            <div className="sidebar-metric">
-              <span>Live</span>
-              <strong>{deployedCount}</strong>
-            </div>
-            <div className="sidebar-metric">
-              <span>Staged</span>
-              <strong>{stagedCount}</strong>
-            </div>
+          <div className="sidebar-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            {[
+              { label: 'Protocols', val: scripts.length },
+              { label: 'Live', val: deployedCount },
+              { label: 'Staged', val: stagedCount }
+            ].map(m => (
+              <div key={m.label} style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid rgba(255,255,255,0.02)' }}>
+                <span style={{ fontSize: '0.55rem', color: 'var(--text-dim)', display: 'block', marginBottom: '4px' }}>{m.label.toUpperCase()}</span>
+                <strong style={{ fontSize: '1rem', fontWeight: '800' }}>{m.val}</strong>
+              </div>
+            ))}
           </div>
         </div>
-        <nav className="sidebar-nav" style={{ flex: 1 }}>
+
+        <nav className="sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {[
-            { id: 'navigator', label: 'Neural Assistant', icon: <Terminal size={18} /> },
-            { id: 'library', label: 'Archive Vault', icon: <Archive size={18} /> },
-            { id: 'deploy', label: 'Deploy New', icon: <PlusCircle size={18} /> },
-            { id: 'deployments', label: 'Live Nodes', icon: <ActivityIcon size={18} /> },
-            { id: 'models', label: 'AI Models', icon: <Cpu size={18} /> },
-            ...(isAdmin ? [{ id: 'admin', label: 'Root Console', icon: <ShieldCheck size={18} /> }] : [])
+            { id: 'navigator', label: 'Neural Assistant', icon: <Terminal size={20} /> },
+            { id: 'library', label: 'Archive Vault', icon: <Archive size={20} /> },
+            { id: 'deploy', label: 'Protocol Forge', icon: <PlusCircle size={20} /> },
+            { id: 'deployments', label: 'Live Operations', icon: <ActivityIcon size={20} /> },
+            { id: 'neural_vault', label: 'Neural Archive', icon: <Database size={20} /> },
+            { id: 'models', label: 'Model Forge', icon: <Cpu size={20} /> },
+            ...(isAdmin ? [{ id: 'admin', label: 'Admin Console', icon: <ShieldCheck size={20} /> }] : [])
           ].map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`nav-item ${activeTab === item.id ? 'active' : ''}`} style={{ width: '100%', textAlign: 'left', border: 'none', background: 'none', cursor: 'pointer' }}>
-              {item.icon} {item.label}
+            <button 
+              key={item.id} 
+              onClick={() => {
+                setActiveTab(item.id);
+                setIsSidebarOpen(false);
+              }} 
+              className={`nav-item ${activeTab === item.id ? 'active' : ''}`} 
+              style={{ 
+                width: '100%', 
+                textAlign: 'left', 
+                border: 'none', 
+                background: 'none', 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                padding: '14px 20px',
+                borderRadius: 'var(--radius-md)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+            >
+              <span style={{ color: activeTab === item.id ? 'var(--primary)' : 'inherit' }}>{item.icon}</span>
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {activeTab === item.id && <motion.div layoutId="active-nav" style={{ width: '4px', height: '16px', background: 'var(--primary)', borderRadius: '999px' }} />}
             </button>
           ))}
         </nav>
         <div className="sidebar-footer">
           {!isAdmin ? (
-            <button onClick={() => setShowLogin(true)} className="nav-item sidebar-auth" style={{ width: '100%', border: 'none', background: 'rgba(255,255,255,0.02)', cursor: 'pointer' }}><Lock size={16} /> Admin Login</button>
+            <button onClick={() => setShowLogin(true)} className="nav-item sidebar-auth" style={{ width: '100%', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)', cursor: 'pointer', justifyContent: 'center' }}><Lock size={16} /> Authenticate</button>
           ) : (
-            <button onClick={handleLogout} className="nav-item sidebar-auth active-root" style={{ width: '100%', color: 'var(--cyber-primary)', background: 'rgba(0,242,255,0.05)', border: 'none', fontWeight: '800', cursor: 'pointer' }}><ShieldAlert size={16} /> LOGOUT_ROOT</button>
+            <button onClick={handleLogout} className="nav-item sidebar-auth active-root" style={{ width: '100%', color: 'var(--primary)', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', fontWeight: '800', cursor: 'pointer', justifyContent: 'center' }}><ShieldAlert size={16} /> LOGOUT_ROOT</button>
           )}
         </div>
       </aside>
 
       <main className="main-viewport glass">
-        <div className="glass-dark top-ribbon">
+        <div className="top-ribbon">
+          <button className="mobile-nav-toggle" onClick={() => setIsSidebarOpen(true)}>
+            <Menu size={24} />
+          </button>
           <div className="ribbon-status">
             <Radio size={14} className="status-dot" />
             <span className="mono">{config.broadcast || 'NEURAL_SYSTEMS_ONLINE'}</span>
@@ -744,16 +858,16 @@ function App() {
         <AnimatePresence mode="wait">
           {activeTab === 'navigator' && (
             <motion.div key="nav" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="chat-window">
-              <div className="chat-header" style={{ padding: '32px 64px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="chat-header" style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div className="logo-box" style={{ width: '48px', height: '48px', fontSize: '1.4rem' }}>S</div>
+                  <div className="logo-box" style={{ width: '40px', height: '40px', fontSize: '1.2rem', borderRadius: '12px' }}>S</div>
                   <div>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: '900', margin: 0 }}>Neural Assistant</h2>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', margin: 0, marginTop: '4px' }}>Expert AI companion</p>
+                    <h2 style={{ fontSize: '1.1rem', fontWeight: '900', margin: 0 }}>Neural Assistant</h2>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', margin: 0, marginTop: '2px' }}>Expert AI companion</p>
                   </div>
                 </div>
               </div>
-              <div className="chat-feed custom-scrollbar" style={{ padding: '40px 64px' }}>
+              <div className="chat-feed custom-scrollbar">
                 {messages.length === 1 && !loading && (
                   <div className="prompt-grid">
                     {quickPrompts.map((item) => (
@@ -776,34 +890,67 @@ function App() {
                   </div>
                 )}
                 {messages.map(msg => (
-                  <motion.div key={msg.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className={`msg ${msg.role === 'user' ? 'msg-user' : 'msg-bot'}`} style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', background: 'none', border: 'none', maxWidth: '100%', marginBottom: '48px' }}>
-                    <div className={`message-avatar glass-dark ${msg.role === 'user' ? 'user' : 'bot'}`} style={{ padding: '12px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', color: msg.role === 'user' ? 'var(--cyber-primary)' : 'var(--cyber-secondary)', flexShrink: 0, marginTop: '8px' }}>
+                  <motion.div key={msg.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`msg ${msg.role === 'user' ? 'msg-user' : 'msg-bot'}`} style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', maxWidth: '100%', marginBottom: '40px' }}>
+                    <div className={`message-avatar ${msg.role === 'user' ? 'user' : 'bot'}`} style={{ 
+                      padding: '12px', 
+                      borderRadius: '16px', 
+                      background: msg.role === 'user' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)', 
+                      border: `1px solid ${msg.role === 'user' ? 'rgba(59,130,246,0.2)' : 'rgba(245,158,11,0.2)'}`,
+                      color: msg.role === 'user' ? 'var(--primary)' : 'var(--secondary)',
+                      boxShadow: `0 0 20px ${msg.role === 'user' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)'}`,
+                      flexShrink: 0 
+                    }}>
                       {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
                     </div>
-                    <div className={`glass-dark message-shell ${msg.role === 'user' ? 'user' : 'bot'}`} style={{ padding: '32px 40px', borderRadius: '32px', border: '1px solid rgba(255,255,255,0.05)', flex: 1, color: '#ccc', fontSize: '0.98rem', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+                    <div className="glass-premium" style={{ 
+                      padding: '24px 32px', 
+                      borderRadius: '32px', 
+                      borderTopLeftRadius: msg.role === 'bot' ? '4px' : '32px',
+                      borderTopRightRadius: msg.role === 'user' ? '4px' : '32px',
+                      flex: 1, 
+                      color: '#fff', 
+                      fontSize: '1rem', 
+                      lineHeight: '1.7',
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+                      maxWidth: '85%'
+                    }}>
                       <MarkdownContent content={msg.text} />
                     </div>
                   </motion.div>
                 ))}
-                {loading && <div className="loading-row" style={{ display: 'flex', gap: '8px', padding: '20px 88px' }}><div className="status-dot"/><div className="status-dot"/><div className="status-dot"/></div>}
+                {loading && <div className="loading-row" style={{ display: 'flex', gap: '8px', padding: '12px 24px' }}><div className="status-dot"/><div className="status-dot"/><div className="status-dot"/></div>}
                 <div ref={chatEndRef} />
               </div>
-              <div className="input-matrix" style={{ padding: '32px 64px 48px' }}>
+              <div className="input-matrix">
                 <div className="composer-shell">
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <input value={userInput} onChange={e => setUserInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()} type="text" placeholder="State your neural objective..." className="matrix-field composer-input" style={{ width: '100%', background: 'rgba(0,0,0,0.4)', padding: '24px 32px', fontSize: '1.05rem', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)', outline: 'none' }} />
-                    <button onClick={sendMessage} className="matrix-action composer-send" style={{ position: 'absolute', right: '12px', top: '12px', height: '48px', width: '48px', borderRadius: '16px', background: 'var(--cyber-primary)', color: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={20} fill="currentColor" /></button>
-                  </div>
-                  <div className="composer-footer">
-                    <StatusBadge label={loading ? 'Thinking' : 'Ready'} tone={loading ? 'warning' : 'success'} />
-                  </div>
+                  <textarea 
+                    value={userInput} 
+                    onChange={e => setUserInput(e.target.value)} 
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }} 
+                    placeholder="State your neural objective..." 
+                    className="composer-input"
+                    rows={1}
+                    style={{ height: 'auto' }}
+                  />
+                  <button onClick={sendMessage} className="composer-send" disabled={loading || !userInput.trim()}>
+                    {loading ? <RefreshCcw size={20} className="spin" /> : <Zap size={20} fill="currentColor" />}
+                  </button>
+                </div>
+                <div className="composer-footer">
+                  <span className="composer-caption">Shift + Enter for new line</span>
+                  <StatusBadge label={loading ? 'Thinking' : 'Ready'} tone={loading ? 'warning' : 'success'} />
                 </div>
               </div>
             </motion.div>
           )}
 
           {activeTab === 'deploy' && (
-            <motion.div key="deploy" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ padding: '40px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <motion.div key="deploy" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ padding: '24px 20px', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
               <SectionHero
                 icon={<Rocket size={16} />}
                 eyebrow="Protocol Forge"
@@ -815,33 +962,34 @@ function App() {
                   { label: 'Quality', value: deployForm.quality_score || 'B' },
                 ]}
               />
-              <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? '1fr' : '1fr min(440px, 35%)', gap: '32px', flex: 1, minHeight: 0 }}>
+              <div className="forge-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '32px', flex: 1 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div className="glass-dark editor-shell premium-card" style={{ flex: 1, borderRadius: '40px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <div className="surface-header" style={{ padding: '16px 32px', background: 'rgba(0,242,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between' }}>
-                      <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--cyber-primary)' }}>SOURCE_CORE</span>
-                      <select value={deployForm.language} onChange={e => setDeployForm({...deployForm, language: e.target.value})} className="mono" style={{ background: 'none', border: 'none', color: 'var(--text-soft)', outline: 'none' }}>{availableLanguages.map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select>
+                  <div className="glass-premium editor-shell" style={{ flex: 1, borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: '400px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="surface-header" style={{ padding: '16px 24px', background: 'rgba(59,130,246,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><FileCode size={14} color="var(--primary)" /><span className="mono" style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--primary)' }}>CORE_LOGIC</span></div>
+                      <select value={deployForm.language} onChange={e => setDeployForm({...deployForm, language: e.target.value})} className="mono" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: '8px', fontSize: '0.7rem', outline: 'none' }}>{availableLanguages.map(l => <option key={l} value={l}>{l.toUpperCase()}</option>)}</select>
                     </div>
-                    <textarea value={deployForm.code} onChange={e => setDeployForm({ ...deployForm, code: e.target.value })} placeholder="# Protocol logic..." className="mono custom-scrollbar code-editor" style={{ flex: 1, padding: '32px', background: 'none', border: 'none', outline: 'none', color: '#888', fontSize: '0.95rem', lineHeight: '1.8', resize: 'none' }} />
+                    <textarea value={deployForm.code} onChange={e => setDeployForm({ ...deployForm, code: e.target.value })} placeholder="# Protocol logic here..." className="mono custom-scrollbar code-editor" style={{ flex: 1, padding: '24px', background: 'rgba(0,0,0,0.2)', border: 'none', outline: 'none', color: '#a0aec0', fontSize: '0.95rem', lineHeight: '1.7', resize: 'none' }} />
                   </div>
-                  <button onClick={analyzeCode} disabled={analyzing || !deployForm.code} className="btn-premium" style={{ padding: '24px', borderRadius: '24px' }}>{analyzing ? 'AUDITING...' : 'PERFORM_NEURAL_AUDIT'}</button>
+                  <button onClick={analyzeCode} disabled={analyzing || !deployForm.code} className="btn-premium" style={{ padding: '20px', borderRadius: 'var(--radius-md)', fontSize: '0.9rem', fontWeight: '800', letterSpacing: '0.1em' }}>{analyzing ? 'NEURAL_AUDIT_IN_PROGRESS...' : 'COMMENCE_NEURAL_AUDIT'}</button>
                 </div>
-                <div className="glass-dark editor-side premium-card" style={{ padding: '48px', borderRadius: '48px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                   <div className="field-stack"><label className="mono field-label">IDENTIFIER</label><input value={deployForm.name} onChange={e => setDeployForm({ ...deployForm, name: e.target.value })} className="matrix-field" style={{ width: '100%', marginTop: '12px' }} /></div>
-                   <div className="field-stack"><label className="mono field-label">AUTHOR</label><input value={deployForm.author} onChange={e => setDeployForm({ ...deployForm, author: e.target.value })} placeholder="Enter operator name..." className="matrix-field" style={{ width: '100%', marginTop: '12px' }} /></div>
-                   <div className="field-stack"><label className="mono field-label">SUMMARY</label><textarea value={deployForm.description} onChange={e => setDeployForm({ ...deployForm, description: e.target.value })} className="matrix-field" style={{ width: '100%', height: '200px', marginTop: '12px', resize: 'none' }} /></div>
-                   <div className="meta-inline">
-                     <StatusBadge label={`Version ${deployForm.version}`} tone="info" />
-                     <StatusBadge label={`Score ${deployForm.quality_score || 'B'}`} tone="warning" />
+                <div className="glass-premium editor-side" style={{ padding: '40px', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}><Info size={18} color="var(--primary)" /><h3 style={{ fontSize: '1rem', fontWeight: '800' }}>SPECIFICATION</h3></div>
+                   <div className="field-stack"><label className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>PROTOCOL_IDENTIFIER</label><input value={deployForm.name} onChange={e => setDeployForm({ ...deployForm, name: e.target.value })} className="matrix-field" style={{ width: '100%', marginTop: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '14px', borderRadius: '12px', color: '#fff' }} /></div>
+                   <div className="field-stack"><label className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>OPERATOR_SIGNATURE</label><input value={deployForm.author} onChange={e => setDeployForm({ ...deployForm, author: e.target.value })} placeholder="ROOT" className="matrix-field" style={{ width: '100%', marginTop: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '14px', borderRadius: '12px', color: '#fff' }} /></div>
+                   <div className="field-stack"><label className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>PROTOCOL_SUMMARY</label><textarea value={deployForm.description} onChange={e => setDeployForm({ ...deployForm, description: e.target.value })} className="matrix-field" style={{ width: '100%', height: '140px', marginTop: '8px', resize: 'none', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: '14px', borderRadius: '12px', color: '#fff', fontSize: '0.9rem', lineHeight: '1.6' }} /></div>
+                   <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                     <StatusBadge label={`VER ${deployForm.version}`} tone="neutral" />
+                     <StatusBadge label={`CONFIDENCE ${deployForm.quality_score || 'B'}`} tone="warning" />
                    </div>
-                   <button onClick={finalizeDeployment} disabled={loading || !deployForm.name} className="btn-premium" style={{ marginTop: 'auto', padding: '24px', background: 'var(--cyber-primary)', color: 'black', borderRadius: '24px' }}>SUBMIT_FOR_INDEXING</button>
+                   <button onClick={finalizeDeployment} disabled={loading || !deployForm.name} className="btn-premium" style={{ marginTop: 'auto', padding: '20px', background: 'var(--primary)', color: '#000', borderRadius: 'var(--radius-md)', fontSize: '0.9rem', fontWeight: '800' }}>COMMIT_TO_VAULT</button>
                 </div>
               </div>
             </motion.div>
           )}
 
           {activeTab === 'deployments' && (
-            <motion.div key="live" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ padding: '40px', height: '100%', overflowY: 'auto' }}>
+            <motion.div key="live" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ padding: '24px 20px', height: '100%', overflowY: 'auto' }}>
               <SectionHero
                 icon={<ActivityIcon size={16} />}
                 eyebrow="Operations"
@@ -852,119 +1000,140 @@ function App() {
                   { label: 'Staged', value: stagedCount },
                 ]}
               />
-              <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))', gap: '32px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '32px' }}>
                 {deployments.length === 0 ? (
                   <EmptyState
-                    icon={<ActivityIcon size={28} />}
-                    title="No live nodes"
-                    description="Stage a script from the archive to bring your first runtime node into view."
+                    icon={<ActivityIcon size={32} />}
+                    title="No active operations"
+                    description="Stage a protocol from the Archive Vault to initialize your first live node."
                   />
-                ) : deployments.map(dep => (
-                  <div key={dep.name} onClick={() => setInspectDeployment(dep)} className="glass-dark hover-glow premium-card protocol-card" style={{ padding: '40px', borderRadius: '48px', cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', border: '1px solid rgba(255,255,255,0.02)' }}>
-                    <div className="protocol-card-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
-                      <span className="mono" style={{ color: 'var(--cyber-primary)' }}>{dep.language.toUpperCase()}</span>
+                ) : deployments.map((dep, idx) => (
+                  <motion.div 
+                    key={dep.name} 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    onClick={() => setInspectDeployment(dep)} 
+                    className="glass-premium protocol-card" 
+                    style={{ padding: '32px', borderRadius: 'var(--radius-lg)', cursor: 'pointer', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}
+                  >
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: dep.status === 'DEPLOYED' ? 'var(--primary)' : 'var(--secondary)' }} />
+                    <div className="protocol-card-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Hash size={14} color="var(--text-dim)" /><span className="mono" style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: '700' }}>{dep.language.toUpperCase()}</span></div>
                       <StatusBadge label={dep.status} tone={dep.status === 'DEPLOYED' ? 'success' : 'warning'} />
                     </div>
-                    <h3 className="protocol-title" style={{ fontSize: '1.8rem', fontWeight: '900', marginBottom: '16px' }}>{dep.name}</h3>
-                    <p className="protocol-description" style={{ fontSize: '0.95rem', color: 'var(--text-soft)', lineHeight: '1.7', marginBottom: '24px' }}>{dep.description}</p>
-                    <div className="meta-inline">
-                      <StatusBadge label={dep.author || 'UNKNOWN'} tone="neutral" />
-                      <StatusBadge label={`Version ${dep.version || '1.0.0'}`} tone="neutral" />
-                      <StatusBadge label={formatTimestamp(dep.deployed_at || dep.staged_at)} tone="info" />
+                    <h3 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '12px', letterSpacing: '-0.01em' }}>{dep.name}</h3>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '32px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.6' }}>{dep.description}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>BY: {dep.author || 'ROOT'}</span>
+                      </div>
+                      <div className="protocol-actions" style={{ display: 'flex', gap: '10px' }} onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setInspectDeployment(dep)} className="btn-micro" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>INSPECT</button>
+                        {dep.status === 'STAGED' && isAdmin && <button onClick={() => deployToDisk(dep.name)} className="btn-micro" style={{ background: 'var(--primary)', color: '#000', border: 'none' }}>ACTIVATE</button>}
+                      </div>
                     </div>
-                    <div className="protocol-actions" style={{ display: 'flex', gap: '12px' }} onClick={e => e.stopPropagation()}>
-                      <button onClick={() => setInspectDeployment(dep)} className="btn-micro">INSPECT</button>
-                      {isAdmin && <button onClick={() => deleteDeployment(dep.name)} className="btn-micro danger" style={{ borderColor: 'var(--cyber-error)', color: 'var(--cyber-error)' }}><Power size={14} /></button>}
-                      {dep.status === 'STAGED' && isAdmin && <button onClick={() => deployToDisk(dep.name)} className="btn-micro solid" style={{ background: 'var(--cyber-primary)', color: 'black', border: 'none' }}>ACTIVATE</button>}
-                    </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </motion.div>
           )}
 
           {activeTab === 'models' && (
-            <motion.div key="models" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ padding: '40px', height: '100%', overflowY: 'auto' }}>
-              <SectionHero
-                icon={<Cpu size={16} />}
-                eyebrow="Intelligence"
-                title="Neural Infrastructure"
-                description="Manage and monitor locally hosted AI models powering the Neural Assistant and code audit pipelines."
-                action={
-                  <div className="hero-control">
-                    <span className="mono hero-control-label">Available</span>
-                    <span className="mono" style={{ color: 'var(--cyber-primary)', fontWeight: '900' }}>{aiModels.length} MODELS</span>
-                  </div>
-                }
+            <motion.div key="models_vault" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ padding: '24px 20px', height: '100%', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto' }}>
+              <SectionHero 
+                icon={<Cpu size={16} />} 
+                eyebrow="Neural Assets" 
+                title="Neural Forge" 
+                description="Securely analyze neural weights files to extract class labels and metadata."
               />
-              <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))', gap: '32px' }}>
-                <div className="glass-dark premium-card forge-card" style={{ padding: '40px', borderRadius: '48px', border: '1px solid rgba(0,242,255,0.15)', display: 'flex', flexDirection: 'column', gap: '24px', justifyContent: 'center', alignItems: 'center', textAlign: 'center', minHeight: '340px', background: 'rgba(255,255,255,0.01)' }}>
-                  <div style={{ width: '80px', height: '80px', borderRadius: '24px', background: 'rgba(0,242,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--cyber-primary)' }}>
-                    <PlusCircle size={32} />
-                  </div>
-                  <div>
-                    <h3 className="protocol-title" style={{ fontSize: '1.4rem', fontWeight: '900', marginBottom: '8px' }}>FORGE NEURAL NODE</h3>
-                    <p style={{ fontSize: '0.85rem', color: '#666', lineHeight: '1.6' }}>Drop a .pt model file to generate an automated deployment protocol.</p>
-                  </div>
-                  <input
-                    type="file"
-                    id="model-upload"
-                    accept=".pt"
-                    style={{ display: 'none' }}
-                    onChange={(e) => setModelForgeFile(e.target.files[0])}
-                  />
-                  {!modelForgeFile ? (
-                    <label htmlFor="model-upload" className="btn-micro solid" style={{ background: 'var(--cyber-primary)', color: 'black', border: 'none', cursor: 'pointer' }}>SELECT MODEL</label>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-                      <div className="glass" style={{ padding: '12px 20px', borderRadius: '16px', fontSize: '0.8rem', color: 'var(--cyber-primary)', border: '1px solid rgba(0,242,255,0.2)' }}>{modelForgeFile.name}</div>
-                      <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                        <button onClick={forgeModel} disabled={modelForging} className="btn-micro solid" style={{ background: 'white', color: 'black', border: 'none' }}>{modelForging ? 'ANALYZING...' : 'ANALYZE'}</button>
-                        <button onClick={() => setModelForgeFile(null)} className="btn-micro" style={{ color: 'var(--cyber-error)' }}>CANCEL</button>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+                {forgedModelData ? (
+                  <div className="glass-dark premium-card" style={{ padding: '32px', borderRadius: '24px', display: 'flex', flexDirection: 'column', gap: '24px', gridColumn: '1 / -1' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span className="mono" style={{ fontSize: '0.6rem', color: 'var(--cyber-primary)', fontWeight: '900' }}>NEURAL_SPECIFICATION (DATA.YAML)</span>
+                        <StatusBadge label="AUTO_CONFIGURED" tone="success" />
                       </div>
                     </div>
-                  )}
-                </div>
-
-                {forgedModelData && (
-                  <div className="glass-dark premium-card protocol-card active-forge" style={{ padding: '40px', borderRadius: '48px', border: '1px solid var(--cyber-primary)', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', top: 0, right: 0, padding: '12px 24px', background: 'var(--cyber-primary)', color: 'black', fontSize: '0.65rem', fontWeight: '900', borderBottomLeftRadius: '24px' }}>FORGED_READY</div>
-                    <div className="protocol-card-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
-                      <span className="mono" style={{ color: 'var(--cyber-primary)', fontWeight: '900' }}>PYTHON_GEN</span>
+                    
+                    <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', maxHeight: '240px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '16px' }}>
+                       <pre className="mono" style={{ fontSize: '0.75rem', color: '#7ec8a0', lineHeight: '1.6' }}>
+{`# Auto-generated data.yaml
+names:
+${(forgedModelData.classes || []).map((c, i) => `  ${i}: ${c}`).join('\n')}
+nc: ${(forgedModelData.classes || []).length}`}
+                       </pre>
                     </div>
-                    <h3 className="protocol-title" style={{ fontSize: '1.8rem', fontWeight: '900', marginBottom: '16px' }}>{forgedModelData.name}</h3>
-                    <p style={{ fontSize: '0.9rem', color: '#888', marginBottom: '32px', lineHeight: '1.6' }}>{forgedModelData.description}</p>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <button onClick={() => setInspectDeployment(forgedModelData)} className="btn-micro">PREVIEW_CODE</button>
-                      <button onClick={saveForgedModel} className="btn-micro solid" style={{ background: 'var(--cyber-primary)', color: 'black', border: 'none' }}>INDEX_TO_VAULT</button>
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={() => setForgedModelData(null)} className="btn-micro" style={{ flex: 1 }}>CLEAR</button>
+                      <button onClick={saveForgedModel} className="btn-micro" style={{ flex: 1, background: 'var(--cyber-primary)', color: 'black' }}>INDEX_MODEL</button>
                     </div>
                   </div>
+                ) : (
+                  <>
+                    <div onClick={() => document.getElementById('neural-upload').click()} className="glass-dark premium-card hover-glow" style={{ padding: '32px', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '220px', border: '2px dashed rgba(59,130,246,0.2)', cursor: 'pointer' }}>
+                       <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+                          <PlusCircle size={24} color="var(--cyber-primary)" />
+                       </div>
+                       <h3 className="heading-cyber" style={{ fontSize: '1rem', marginBottom: '8px', textAlign: 'center' }}>FORGE NEURAL ANALYSIS</h3>
+                       <p style={{ fontSize: '0.8rem', color: 'var(--text-soft)', textAlign: 'center', maxWidth: '240px' }}>Drop a .pt weights file to extract neural class labels.</p>
+                       <input
+                         type="file"
+                         id="neural-upload"
+                         accept=".pt"
+                         style={{ display: 'none' }}
+                         onChange={e => {
+                           if (e.target.files?.[0]) {
+                             setModelForgeFile(e.target.files[0]);
+                             forgeModel();
+                           }
+                         }}
+                       />
+                    </div>
+                    <div className="glass-dark premium-card" style={{ padding: '24px', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', minHeight: '180px' }}>
+                      <Cpu size={32} color="var(--text-dim)" style={{ opacity: 0.2 }} />
+                      <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '16px' }}>READY_FOR_NEURAL_INPUT</p>
+                    </div>
+                  </>
                 )}
+              </div>
+            </motion.div>
+          )}
 
-                {aiModels.map(model => (
-                  <div key={model.name} className="glass-dark premium-card protocol-card" style={{ padding: '40px', borderRadius: '48px', border: '1px solid rgba(255,255,255,0.02)' }}>
-                    <div className="protocol-card-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
-                      <span className="mono" style={{ color: 'var(--cyber-primary)', fontWeight: '900' }}>MODEL_NODE</span>
-                      <StatusBadge label="READY" tone="success" />
+          {activeTab === 'neural_vault' && (
+            <motion.div key="neural_vault" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ padding: '24px 20px', height: '100%', overflowY: 'auto' }}>
+              <SectionHero
+                icon={<Database size={16} />}
+                eyebrow="Neural Archive"
+                title="Neural Model Vault"
+                description="Secure storage for your forged neural models and extracted class specifications."
+                stats={[
+                  { label: 'Saved Models', value: neuralModels.length }
+                ]}
+              />
+              <div className="protocol-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' }}>
+                {neuralModels.length === 0 ? (
+                  <EmptyState
+                    icon={<Database size={28} />}
+                    title="Vault is empty"
+                    description="Forge and index a neural model from the Neural Data tab to see it here."
+                  />
+                ) : neuralModels.map(model => (
+                  <div key={model.name} className="glass-dark premium-card protocol-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                    <div className="protocol-card-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                      <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--cyber-primary)' }}>NEURAL_MODEL</span>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn-micro" onClick={() => setInspectDeployment(model)}>INSPECT</button>
+                        {isAdmin && <button onClick={() => deleteNeuralModel(model.name)} className="btn-micro danger"><Trash2 size={14} /></button>}
+                      </div>
                     </div>
-                    <h3 className="protocol-title" style={{ fontSize: '1.8rem', fontWeight: '900', marginBottom: '16px' }}>{model.name}</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '12px' }}>
-                        <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>SIZE</span>
-                        <span className="mono" style={{ fontSize: '0.7rem', color: 'white' }}>{model.size ? (model.size / 1024 / 1024 / 1024).toFixed(2) : '0.00'} GB</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '12px' }}>
-                        <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>QUANTIZATION</span>
-                        <span className="mono" style={{ fontSize: '0.7rem', color: 'white' }}>{model.details?.quantization_level || 'N/A'}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '12px' }}>
-                        <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>MODIFIED</span>
-                        <span className="mono" style={{ fontSize: '0.7rem', color: 'white' }}>{new Date(model.modified_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    <div className="meta-inline">
-                      <StatusBadge label={model.details?.family || 'NEURAL'} tone="info" />
-                      <StatusBadge label={model.details?.parameter_size || 'DYNAMIC'} tone="neutral" />
+                    <h3 className="protocol-title" style={{ fontSize: '1.2rem', fontWeight: '900', marginBottom: '12px' }}>{model.name}</h3>
+                    <div className="meta-inline" style={{ marginTop: 'auto' }}>
+                      <StatusBadge label={`${(model.classes || []).length} Classes`} tone="info" />
+                      <StatusBadge label={model.version || '1.0.0'} tone="neutral" />
                     </div>
                   </div>
                 ))}
@@ -975,41 +1144,52 @@ function App() {
           {activeTab === 'library' && (() => {
             const unstagedScripts = scripts.filter(s => !deployments.some(d => d.name === s.name));
             return (
-              <motion.div key="lib" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ padding: '40px', height: '100%', overflowY: 'auto' }}>
-                <SectionHero
+              <motion.div key="lib" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ padding: '24px 20px', height: '100%', overflowY: 'auto' }}>
+                <SectionHero 
                   icon={<Archive size={16} />}
-                  eyebrow="Archive"
+                  eyebrow="Knowledge Base"
                   title="Archive Vault"
-                  description="Your indexed scripts live here with metadata, audit context, and one-click staging into operations."
+                  description="Secure storage for verified neural protocols and forged operation scripts."
                   stats={[
-                    { label: 'Indexed', value: scripts.length },
-                    { label: 'Ready to Stage', value: unstagedScripts.length },
+                    { label: 'Protocols', value: scripts.length },
+                    { label: 'Unstaged', value: unstagedScripts.length }
                   ]}
                 />
-                <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(auto-fill, minmax(360px, 1fr))', gap: '32px' }}>
-                  {unstagedScripts.length === 0 ? (
-                    <EmptyState
-                      icon={<Archive size={28} />}
-                      title={scripts.length > 0 ? "All scripts staged" : "Archive is empty"}
-                      description={scripts.length > 0 ? "All your archived protocols are currently in the staging or live pipeline." : "Analyze and submit a protocol from the deploy tab to build your first premium archive entry."}
-                    />
-                  ) : unstagedScripts.map(script => (
-                    <div key={script.name} className="glass-dark premium-card protocol-card" style={{ padding: '32px', borderRadius: '40px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                      <div className="protocol-card-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
-                        <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--cyber-primary)' }}>{script.language}</span>
+                
+                <div className="protocol-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '32px' }}>
+                  {unstagedScripts.map((script, idx) => (
+                    <motion.div 
+                      key={script.name} 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.04 }}
+                      className="glass-premium protocol-card" 
+                      style={{ padding: '32px', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}
+                    >
+                      <div className="protocol-card-top" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><Command size={14} color="var(--text-dim)" /><span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '700' }}>VAULT_ID: {script.slug}</span></div>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn-micro" onClick={() => setInspectDeployment(script)}>INSPECT</button>
-                          {isAdmin && <button onClick={() => stageScript(script)} className="btn-micro">STAGE</button>}
+                          <button onClick={() => setInspectDeployment(script)} className="btn-micro" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>VIEW</button>
+                          {isAdmin && <button onClick={() => deleteScript(script.name)} className="btn-micro danger" style={{ borderColor: 'rgba(239,68,68,0.2)' }}><Trash2 size={14} /></button>}
                         </div>
                       </div>
-                      <h3 className="protocol-title" style={{ fontSize: '1.5rem', fontWeight: '900', marginBottom: '16px' }}>{script.name}</h3>
-                      <p className="protocol-description" style={{ fontSize: '0.9rem', color: 'var(--text-soft)', lineHeight: '1.7' }}>{script.description}</p>
-                      <div className="meta-inline">
-                        <StatusBadge label={script.author || 'UNKNOWN'} tone="neutral" />
-                        <StatusBadge label={`Version ${script.version || '1.0.0'}`} tone="neutral" />
-                        <StatusBadge label={`${(script.key_features || []).length} features`} tone="info" />
+                      <h3 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '12px' }}>{script.name}</h3>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '24px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.6' }}>{script.description}</p>
+                      <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
+                        <StatusBadge label={script.language.toUpperCase()} tone="neutral" />
+                        <StatusBadge label={`${(script.features || []).length} Nodes`} tone="info" />
                       </div>
-                    </div>
+                      <button 
+                        onClick={() => {
+                          setDeployForm(prev => ({ ...prev, name: script.name, code: script.code, language: script.language }));
+                          setActiveTab('deploy');
+                        }}
+                        className="btn-premium" 
+                        style={{ width: '100%', padding: '16px', borderRadius: 'var(--radius-md)', marginTop: 'auto', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                      >
+                        STAGE_PROTOCOL
+                      </button>
+                    </motion.div>
                   ))}
                 </div>
               </motion.div>
@@ -1017,22 +1197,43 @@ function App() {
           })()}
 
           {activeTab === 'admin' && isAdmin && (
-            <motion.div key="admin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div className="glass-dark admin-tab-row" style={{ padding: '20px 48px', display: 'flex', gap: '48px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+            <motion.div key="admin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+              <div className="glass-premium admin-tab-row" style={{ padding: '16px 24px', display: 'flex', gap: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'nowrap', overflowX: 'auto', whiteSpace: 'nowrap', background: 'rgba(255,255,255,0.02)' }}>
                 {[
-                  { id: 'dashboard', label: 'NEURAL_HEALTH', icon: <Cpu size={18} /> },
-                  { id: 'governance', label: 'GOVERNANCE', icon: <ShieldAlert size={18} /> },
-                  { id: 'sandbox', label: 'NEURAL_LAB', icon: <FlaskConical size={18} /> },
-                  { id: 'terminal', label: 'ROOT_SHELL', icon: <Terminal size={18} /> }
+                  { id: 'dashboard', label: 'HEALTH_METRICS', icon: <Cpu size={16} /> },
+                  { id: 'governance', label: 'GOVERNANCE_PROTOCOL', icon: <ShieldAlert size={16} /> },
+                  { id: 'sandbox', label: 'SIMULATION_LAB', icon: <FlaskConical size={16} /> },
+                  { id: 'terminal', label: 'ROOT_DECK', icon: <Terminal size={16} /> }
                 ].map(t => (
-                  <button key={t.id} onClick={() => setAdminSubTab(t.id)} className={`admin-tab ${adminSubTab === t.id ? 'active' : ''}`} style={{ border: 'none', background: 'none', color: adminSubTab === t.id ? 'var(--cyber-primary)' : '#555', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.85rem' }}>{t.icon} {t.label}</button>
+                  <button 
+                    key={t.id} 
+                    onClick={() => setAdminSubTab(t.id)} 
+                    className={`admin-tab ${adminSubTab === t.id ? 'active' : ''}`} 
+                    style={{ 
+                      border: 'none', 
+                      background: 'none', 
+                      color: adminSubTab === t.id ? 'var(--primary)' : 'var(--text-dim)', 
+                      fontWeight: '800', 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '10px', 
+                      fontSize: '0.7rem', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.15em',
+                      transition: 'all 0.3s ease',
+                      opacity: adminSubTab === t.id ? 1 : 0.6
+                    }}
+                  >
+                    {t.icon} {t.label}
+                  </button>
                 ))}
               </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '48px' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '24px 20px' }}>
                 <AnimatePresence mode="wait">
                   {adminSubTab === 'dashboard' && (
-                    <motion.div key="dash" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? '1fr' : '1fr 380px', gap: '32px', height: '100%' }}>
-                       <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                    <motion.div key="dash" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: 'auto' }}>
+                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                           <SectionHero
                             icon={<Gauge size={16} />}
                             eyebrow="Admin Telemetry"
@@ -1040,27 +1241,26 @@ function App() {
                             description="Track system load, archive activity, and model reachability from one premium operations console."
                             stats={[
                               { label: 'Latency', value: `${systemHealth.network_latency || 0}ms` },
-                              { label: 'Model', value: (systemHealth.ollama_status || 'unknown').toUpperCase() },
                               { label: 'Uptime', value: formatUptime(systemHealth.uptime_seconds) },
                             ]}
                           />
-                          <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(3, 1fr)', gap: '24px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
                              {[
-                               { label: 'CPU_LOAD', val: `${systemHealth.cpu_usage}%`, icon: <Cpu />, col: 'var(--cyber-primary)', hist: healthHistory },
-                               { label: 'ACTIVE_NODES', val: deployments.length, icon: <ActivityIcon />, col: 'var(--cyber-success)', hist: [] },
-                               { label: 'MEM_ALLOC', val: `${(systemHealth.memory_usage/1024).toFixed(1)}GB`, icon: <Database />, col: 'var(--cyber-secondary)', hist: [] }
+                               { label: 'CPU_LOAD', val: `${systemHealth.cpu_usage}%`, icon: <Cpu size={16} />, col: 'var(--cyber-primary)', hist: healthHistory },
+                               { label: 'ACTIVE_NODES', val: deployments.length, icon: <ActivityIcon size={16} />, col: 'var(--cyber-success)', hist: [] },
+                               { label: 'MEM_ALLOC', val: `${(systemHealth.memory_usage/1024).toFixed(1)}GB`, icon: <Database size={16} />, col: 'var(--cyber-secondary)', hist: [] }
                              ].map(s => (
-                               <div key={s.label} className="glass-dark premium-card metric-card" style={{ padding: '32px', borderRadius: '40px', textAlign: 'center' }}>
-                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                               <div key={s.label} className="glass-dark premium-card metric-card" style={{ padding: '20px', borderRadius: '20px', textAlign: 'center' }}>
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                                    <div style={{ color: s.col }}>{s.icon}</div>
                                    {s.hist && s.hist.length > 0 && <LineChart data={s.hist} />}
                                  </div>
-                                 <p style={{ fontSize: '0.6rem', color: 'var(--text-dim)', fontWeight: '900' }}>{s.label}</p>
-                                 <p style={{ fontSize: '1.8rem', fontWeight: '900' }}>{s.val}</p>
+                                 <p style={{ fontSize: '0.6rem', color: 'var(--text-dim)', fontWeight: '900', letterSpacing: '0.1em' }}>{s.label}</p>
+                                 <p style={{ fontSize: '1.4rem', fontWeight: '900' }}>{s.val}</p>
                                </div>
                              ))}
                           </div>
-                          <div className="glass-dark premium-card" style={{ flex: 1, borderRadius: '48px', padding: '40px', display: 'flex', flexDirection: 'column' }}>
+                          <div className="glass-dark premium-card" style={{ flex: 1, borderRadius: '24px', padding: '24px', display: 'flex', flexDirection: 'column', minHeight: '300px' }}>
                              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}><ActivityIcon color="var(--cyber-primary)" /><h3 className="heading-cyber" style={{ fontSize: '1rem' }}>ACTIVITY_PULSE</h3></div>
                              <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto' }}>
                                 {activityFeed.map((a, i) => (
@@ -1083,12 +1283,11 @@ function App() {
                        </div>
                     </motion.div>
                   )}
-
                   {adminSubTab === 'governance' && (
-                    <motion.div key="gov" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(2, 1fr)', gap: '32px' }}>
-                       <div className="glass-dark premium-card" style={{ padding: '48px', borderRadius: '48px', display: 'flex', flexDirection: 'column', gap: '40px' }}>
+                    <motion.div key="gov" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                       <div className="glass-dark premium-card" style={{ padding: '32px', borderRadius: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}><Sliders color="var(--cyber-primary)" /> <h3 className="heading-cyber">PROTOCOL_LIMITS</h3></div>
-                          <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? '1fr' : '1fr 1fr', gap: '32px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
                              {[
                                { label: 'CHAT_SESSION_MAX', key: 'chat_limit', min: 1 },
                                { label: 'ARCHIVE_STORAGE_MAX', key: 'storage_limit', min: 1 },
@@ -1096,7 +1295,7 @@ function App() {
                                { label: 'API_REQUEST_RATE', key: 'request_rate', min: 5 }
                              ].map(limit => (
                                <div key={limit.key}>
-                                  <label className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)' }}>{limit.label}</label>
+                                  <label className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)', letterSpacing: '0.1em' }}>{limit.label}</label>
                                   <input 
                                     type="number" 
                                     value={govLimits[limit.key]} 
@@ -1105,66 +1304,66 @@ function App() {
                                       setGovLimits(prev => ({...prev, [limit.key]: isNaN(val) ? limit.min : Math.max(val, limit.min)}));
                                     }} 
                                     className="matrix-field" 
-                                    style={{ width: '100%', marginTop: '12px' }} 
+                                    style={{ width: '100%', marginTop: '8px' }} 
                                   />
                                </div>
                              ))}
                           </div>
-                          <button onClick={() => updateConfig(govLimits)} className="btn-premium" style={{ padding: '24px', borderRadius: '24px' }}>SYNCHRONIZE_GOVERNANCE</button>
+                          <button onClick={() => updateConfig(govLimits)} className="btn-premium" style={{ padding: '16px', borderRadius: '16px' }}>SYNCHRONIZE_GOVERNANCE</button>
                        </div>
-                       <div className="glass-dark premium-card" style={{ padding: '48px', borderRadius: '48px', display: 'flex', flexDirection: 'column', gap: '40px' }}>
+                       <div className="glass-dark premium-card" style={{ padding: '32px', borderRadius: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}><Shield color="var(--cyber-primary)" /> <h3 className="heading-cyber">SYSTEM_OVERRIDE</h3></div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                             <div className="glass-dark premium-card" style={{ padding: '32px', borderRadius: '32px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                   <div><p style={{ fontWeight: '900', fontSize: '1.1rem' }}>MAINTENANCE_LOCK</p></div>
-                                   <button onClick={() => updateConfig({ maintenance_mode: !maintenanceMode })} className="btn-micro" style={{ background: maintenanceMode ? 'var(--cyber-error)' : 'none', color: maintenanceMode ? 'white' : '#666', padding: '12px 24px' }}>{maintenanceMode ? 'ACTIVE' : 'READY'}</button>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                             <div className="glass-dark premium-card" style={{ padding: '24px', borderRadius: '20px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                                   <div><p style={{ fontWeight: '700', fontSize: '1rem' }}>MAINTENANCE_LOCK</p></div>
+                                   <button onClick={() => updateConfig({ maintenance_mode: !maintenanceMode })} className="btn-micro" style={{ background: maintenanceMode ? 'var(--cyber-error)' : 'rgba(255,255,255,0.02)', color: maintenanceMode ? 'white' : 'var(--text-soft)', padding: '10px 20px' }}>{maintenanceMode ? 'ACTIVE' : 'READY'}</button>
                                 </div>
                              </div>
                              <div>
-                                <label className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)' }}>BROADCAST_PULSE</label>
-                                <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
-                                   {/* broadcastDraft is 100% isolated — polling never touches it */}
+                                <label className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)', letterSpacing: '0.1em' }}>BROADCAST_PULSE</label>
+                                <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                                    <input 
                                      value={broadcastDraft} 
                                      onChange={e => setBroadcastDraft(e.target.value)}
-                                     placeholder="Enter broadcast message..."
+                                     placeholder="Broadcast..."
                                      className="matrix-field" 
                                      style={{ flex: 1 }} 
                                    />
-                                   <button onClick={() => updateConfig({ broadcast: broadcastDraft })} className="btn-micro" style={{ padding: '0 24px' }}>PULSE</button>
+                                   <button onClick={() => updateConfig({ broadcast: broadcastDraft })} className="btn-micro" style={{ padding: '0 20px' }}>PULSE</button>
                                 </div>
                              </div>
                           </div>
                        </div>
                     </motion.div>
                   )}
-
                   {adminSubTab === 'sandbox' && (
-                    <motion.div key="sandbox" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} style={{ height: '100%', display: 'grid', gridTemplateColumns: isCompactLayout ? '1fr' : '1fr 400px', gap: '32px' }}>
-                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                          <div className="glass-dark premium-card editor-shell" style={{ flex: 1, borderRadius: '40px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                             <div className="surface-header" style={{ padding: '16px 32px', background: 'rgba(0,242,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span className="mono" style={{ fontSize: '0.7rem', color: 'var(--cyber-primary)' }}>NEURAL_LAB_STRESS_TEST</span></div>
-                             <textarea value={sandboxCode} onChange={e => setSandboxCode(e.target.value)} placeholder="# Construct protocol..." className="mono custom-scrollbar code-editor" style={{ flex: 1, padding: '32px', background: 'none', border: 'none', outline: 'none', color: '#aaa', fontSize: '0.95rem', lineHeight: '1.8', resize: 'none' }} />
+                    <motion.div key="sandbox" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} style={{ height: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div className="glass-dark premium-card editor-shell" style={{ flex: 1, borderRadius: '24px', display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: '300px' }}>
+                             <div className="surface-header" style={{ padding: '12px 24px', background: 'rgba(59,130,246,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span className="mono" style={{ fontSize: '0.65rem', color: 'var(--cyber-primary)' }}>NEURAL_LAB_STRESS_TEST</span></div>
+                             <textarea value={sandboxCode} onChange={e => setSandboxCode(e.target.value)} placeholder="# Construct protocol..." className="mono custom-scrollbar code-editor" style={{ flex: 1, padding: '24px', background: 'none', border: 'none', outline: 'none', color: '#aaa', fontSize: '0.9rem', lineHeight: '1.7', resize: 'none' }} />
                           </div>
-                          <button onClick={runSandbox} disabled={sandboxing} className="btn-premium" style={{ padding: '24px', borderRadius: '24px' }}>COMMENCE_SIMULATION</button>
+                          <button onClick={runSandbox} disabled={sandboxing} className="btn-premium" style={{ padding: '16px', borderRadius: '16px' }}>COMMENCE_SIMULATION</button>
                        </div>
-                       <div className="glass-dark premium-card" style={{ borderRadius: '40px', padding: '32px', display: 'flex', flexDirection: 'column' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}><Binary size={18} color="var(--cyber-primary)" /><h3 className="heading-cyber" style={{ fontSize: '0.8rem' }}>SIMULATED_OUTPUT</h3></div>
-                          <div className="custom-scrollbar output-shell" style={{ flex: 1, background: '#000', borderRadius: '24px', padding: '24px', border: '1px solid #111', color: '#0f0', fontSize: '0.85rem' }}>{sandboxOutput || "Awaiting neural trigger..."}</div>
+                       <div className="glass-dark premium-card" style={{ borderRadius: '24px', padding: '24px', display: 'flex', flexDirection: 'column', minHeight: '300px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}><Binary size={18} color="var(--cyber-primary)" /><h3 className="heading-cyber" style={{ fontSize: '0.75rem' }}>SIMULATED_OUTPUT</h3></div>
+                          <div className="custom-scrollbar output-shell" style={{ flex: 1, background: '#000', borderRadius: '16px', padding: '20px', border: '1px solid #111', color: '#0f0', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>{sandboxOutput || "Awaiting neural trigger..."}</div>
                        </div>
                     </motion.div>
                   )}
-
                   {adminSubTab === 'terminal' && (
-                    <motion.div key="term" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="terminal-shell" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#000', borderRadius: '48px', padding: '48px', border: '1px solid #111' }}>
-                      <div className="custom-scrollbar terminal-output" style={{ flex: 1, overflowY: 'auto', fontFamily: 'JetBrains Mono', color: '#0f0', fontSize: '1rem', lineHeight: '1.6' }}>
-                        <div style={{ color: 'var(--text-dim)', marginBottom: '32px' }}>ROOT_SESSION_ACTIVE // UID: 0 // SCRIPT_SHELL_v4.5</div>
-                        {terminalOutput.map((o, i) => <div key={i} style={{ marginBottom: '16px', color: o.type === 'err' ? 'var(--cyber-error)' : o.type === 'in' ? '#555' : '#0f0' }}>{o.text}</div>)}
+                    <motion.div key="term" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="terminal-shell" style={{ height: '500px', display: 'flex', flexDirection: 'column', background: '#000', borderRadius: '24px', padding: '24px', border: '1px solid #111' }}>
+                      <div className="custom-scrollbar terminal-output" style={{ flex: 1, overflowY: 'auto', fontFamily: 'IBM Plex Mono', color: '#0f0', fontSize: '0.85rem', lineHeight: '1.6' }}>
+                        <div style={{ color: 'var(--text-dim)', marginBottom: '16px', fontSize: '0.65rem' }}>ROOT_SESSION_ACTIVE // UID: 0 // SCRIPT_SHELL_v4.5</div>
+                        {terminalOutput.map((o, i) => <div key={i} style={{ marginBottom: '8px', color: o.type === 'err' ? 'var(--cyber-error)' : o.type === 'in' ? '#555' : '#0f0' }}>{o.text}</div>)}
                         {terminalLoading && <div className="mono" style={{ color: 'var(--cyber-primary)', opacity: 0.6, animation: 'pulse 1.5s infinite' }}>PRODUCING_OUTPUT...</div>}
                         <div ref={termEndRef} />
                       </div>
-                      <div className="terminal-input-row" style={{ display: 'flex', gap: '24px', marginTop: '40px', borderTop: '1px solid #111', paddingTop: '40px', flexWrap: isCompactLayout ? 'wrap' : 'nowrap' }}><span className="mono" style={{ color: 'var(--text-dim)', fontWeight: '900' }}>root@script_shell:~$</span><input value={terminalInput} onChange={e => setTerminalInput(e.target.value)} onKeyDown={handleTerminalKeyDown} className="mono terminal-input" style={{ background: 'none', border: 'none', color: 'white', flex: 1, outline: 'none', fontSize: '1rem', minWidth: isCompactLayout ? '100%' : '0' }} autoFocus /></div>
+                      <div className="terminal-input-row" style={{ display: 'flex', gap: '12px', marginTop: '20px', borderTop: '1px solid #111', paddingTop: '20px', flexWrap: 'wrap' }}>
+                        <span className="mono" style={{ color: 'var(--text-dim)', fontWeight: '700', fontSize: '0.75rem' }}>root@script_shell:~$</span>
+                        <input value={terminalInput} onChange={e => setTerminalInput(e.target.value)} onKeyDown={handleTerminalKeyDown} className="mono terminal-input" style={{ background: 'none', border: 'none', color: 'white', flex: 1, outline: 'none', fontSize: '0.85rem', minWidth: '100%' }} />
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1187,101 +1386,88 @@ function App() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               className="glass modal-shell"
-              style={{ width: 'min(1800px, 96vw)', height: '95vh', borderRadius: '48px', overflow: 'hidden', display: 'flex', flexDirection: isCompactLayout ? 'column' : 'row', border: '1px solid rgba(0,242,255,0.08)' }}
+              style={{ width: '96vw', maxWidth: '1400px', height: '90vh', borderRadius: '32px', overflow: 'hidden', display: 'flex', flexDirection: isCompactLayout ? 'column' : 'row', border: '1px solid rgba(59,130,246,0.1)' }}
             >
-              {/* LEFT PANEL — Source Code */}
+                     {/* LEFT PANEL — Source Code */}
               <div
-                className="custom-scrollbar"
-                style={{
-                  flex: isCompactLayout ? 'none' : '1',
-                  height: isCompactLayout ? '50%' : '100%',
-                  background: '#050608',
-                  borderRight: isCompactLayout ? 'none' : '1px solid rgba(255,255,255,0.04)',
-                  borderBottom: isCompactLayout ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden',
-                }}
+                className="modal-code-panel"
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: isCompactLayout ? 'none' : '1px solid rgba(255,255,255,0.05)', borderBottom: isCompactLayout ? '1px solid rgba(255,255,255,0.05)' : 'none', minHeight: isCompactLayout ? '40vh' : '0', overflow: 'hidden' }}
               >
-                {/* Code header bar */}
-                <div style={{ padding: '20px 32px', background: 'rgba(0,242,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <FileCode size={16} color="var(--cyber-primary)" />
-                    <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--cyber-primary)', fontWeight: '900', letterSpacing: '0.12em' }}>SOURCE_PROTOCOL</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>{inspectDeployment.language.toUpperCase()}</span>
-                    <button
-                      className="btn-micro"
-                      onClick={() => navigator.clipboard.writeText(inspectDeployment.code || '')}
-                      style={{ padding: '8px 16px', fontSize: '0.65rem' }}
-                    >
-                      COPY
-                    </button>
+                <div className="surface-header" style={{ padding: '20px 32px', background: 'rgba(59,130,246,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><FileCode size={18} color="var(--primary)" /><span className="mono" style={{ fontSize: '0.8rem', fontWeight: '800', letterSpacing: '0.1em' }}>PROTOCOL_SOURCE_CORE</span></div>
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{inspectDeployment.language?.toUpperCase() || 'UNKNOWN'}</span>
+                    <button className="btn-micro" style={{ background: 'rgba(255,255,255,0.05)', padding: '8px 16px' }} onClick={() => navigator.clipboard.writeText(inspectDeployment.code || '')}>COPY_LOGIC</button>
                   </div>
                 </div>
-                {/* Code body — scrollable */}
-                <div className="custom-scrollbar" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
-                  <pre
-                    className="mono"
-                    style={{
-                      margin: 0,
-                      padding: '3rem 3.5rem',
-                      fontSize: '0.9rem',
-                      color: '#7ec8a0',
-                      lineHeight: '1.85',
-                      whiteSpace: 'pre',
-                      minHeight: '100%',
-                      background: 'transparent',
-                    }}
-                  >
-                    <code>{inspectDeployment.code}</code>
-                  </pre>
+                <div className="custom-scrollbar" style={{ flex: 1, padding: '32px', overflowY: 'auto', background: 'rgba(0,0,0,0.3)' }}>
+                  <pre className="mono" style={{ fontSize: '0.9rem', lineHeight: '1.8', color: '#a0aec0', whiteSpace: 'pre-wrap' }}><code>{inspectDeployment.code || inspectDeployment.description}</code></pre>
                 </div>
               </div>
 
-              {/* RIGHT PANEL — All metadata */}
+              {/* RIGHT PANEL — Inspection Deck */}
               <div
                 className="custom-scrollbar modal-pane modal-pane-side"
                 style={{
-                  flex: isCompactLayout ? 'none' : '0 0 480px',
+                  flex: isCompactLayout ? 'none' : '0 0 520px',
                   height: isCompactLayout ? '50%' : '100%',
-                  background: 'rgba(8,10,14,0.95)',
+                  background: 'rgba(5,7,10,0.98)',
                   overflowY: 'auto',
-                  padding: isCompactLayout ? '2rem' : '3.5rem 4rem',
+                  padding: isCompactLayout ? '2rem' : '4rem',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '40px',
+                  gap: '48px',
                 }}
               >
                 {/* Close */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
-                  <button onClick={() => setInspectDeployment(null)} className="btn-micro" style={{ padding: '14px', borderRadius: '14px' }}>
-                    <X size={20} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                  {isAdmin && (
+                    <button 
+                      onClick={() => {
+                        const name = inspectDeployment.name;
+                        const isLive = !!inspectDeployment.status;
+                        if (isLive) {
+                          deleteDeployment(name).then(() => setInspectDeployment(null));
+                        } else {
+                          deleteScript(name).then(() => setInspectDeployment(null));
+                        }
+                      }} 
+                      className="btn-micro danger" 
+                      style={{ padding: '12px 24px', background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.2)', color: 'var(--cyber-error)', fontWeight: '800' }}
+                    >
+                      PURGE_PROTOCOL
+                    </button>
+                  )}
+                  <button onClick={() => setInspectDeployment(null)} className="btn-micro" style={{ padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)' }}>
+                    <X size={24} />
                   </button>
                 </div>
 
                 {/* Title block */}
                 <div>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                    <StatusBadge label={inspectDeployment.author || 'UNKNOWN'} tone="neutral" />
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                    <StatusBadge label={inspectDeployment.author || 'ROOT'} tone="neutral" />
                     <StatusBadge label={inspectDeployment.language.toUpperCase()} tone="info" />
-                    <StatusBadge label={`VER ${inspectDeployment.version}`} tone="neutral" />
+                    <StatusBadge label={`VER ${inspectDeployment.version || '1.0.0'}`} tone="neutral" />
                     {inspectDeployment.status && (
                       <StatusBadge label={inspectDeployment.status} tone={inspectDeployment.status === 'DEPLOYED' ? 'success' : 'warning'} />
                     )}
                   </div>
-                  <h2 className="heading-cyber" style={{ fontSize: '2.4rem', marginBottom: '16px', lineHeight: 1.1 }}>
-                    {inspectDeployment.name.toUpperCase()}
+                  <h2 style={{ fontSize: '2.8rem', fontWeight: '800', marginBottom: '20px', lineHeight: 1, letterSpacing: '-0.02em', background: 'linear-gradient(to bottom, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    {inspectDeployment.name}
                   </h2>
-                  <p style={{ fontSize: '1rem', color: '#888', lineHeight: '1.8', marginBottom: '20px' }}>
+                  <p style={{ fontSize: '1.05rem', color: 'var(--text-secondary)', lineHeight: '1.7', marginBottom: '32px' }}>
                     {inspectDeployment.description}
                   </p>
-                  <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-soft)' }}>AUTHOR: {inspectDeployment.author || 'UNKNOWN'}</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>VER: {inspectDeployment.version}</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--cyber-primary)' }}>ENV: {inspectDeployment.language.toUpperCase()}</span>
-                    <span className="mono" style={{ fontSize: '0.75rem', color: '#555' }}>UPDATED: {formatTimestamp(inspectDeployment.updated_at || inspectDeployment.staged_at || inspectDeployment.created_at)}</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '32px' }}>
+                    <div className="meta-box">
+                      <span className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>TIMESTAMP</span>
+                      <span className="mono" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{formatTimestamp(inspectDeployment.updated_at || inspectDeployment.staged_at || inspectDeployment.created_at)}</span>
+                    </div>
+                    <div className="meta-box">
+                      <span className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>SIGNATURE</span>
+                      <span className="mono" style={{ fontSize: '0.8rem', color: 'var(--primary)' }}>{inspectDeployment.author || 'ROOT_OPERATOR'}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1397,16 +1583,34 @@ function App() {
       </AnimatePresence>
 
 
-      <AnimatePresence>{showLogin && (
-        <motion.div className="auth-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="glass auth-card" style={{ width: '420px', padding: '48px', borderRadius: '40px', textAlign: 'center' }}>
-            <Lock size={56} color="var(--cyber-primary)" style={{ margin: '0 auto 32px' }} /><h2 className="heading-cyber">ROOT_AUTH</h2>
-            <p className="auth-copy">Secure the premium control plane with root credentials to access governance, health, sandbox, and terminal operations.</p>
-            <input type="password" value={adminPass} onChange={e => setAdminPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} className="matrix-field" style={{ width: '100%', marginTop: '40px', textAlign: 'center', fontSize: '1.2rem', letterSpacing: '0.3em' }} autoFocus />
-            <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}><button onClick={() => setShowLogin(false)} className="btn-micro" style={{ flex: 1 }}>CANCEL</button><button onClick={handleLogin} className="btn-premium" style={{ flex: 2 }}>AUTHORIZE</button></div>
-          </div>
-        </motion.div>
-      )}</AnimatePresence>
+      <AnimatePresence>
+        {showLogin && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="glass-dark auth-card" style={{ width: '100%', maxWidth: '400px', padding: '32px', borderRadius: '32px', border: '1px solid rgba(59,130,246,0.2)', boxShadow: '0 20px 80px rgba(0,0,0,0.5)' }}>
+              <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                 <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}><ShieldCheck size={32} color="var(--cyber-primary)" /></div>
+                 <h2 className="heading-cyber" style={{ fontSize: '1.5rem', marginBottom: '8px' }}>ROOT_ACCESS</h2>
+                 <p style={{ fontSize: '0.85rem', color: 'var(--text-soft)' }}>Enter authorization code to unlock administrative overrides.</p>
+              </div>
+              <div className="field-stack" style={{ marginBottom: '24px' }}>
+                <label className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)', letterSpacing: '0.1em' }}>ACCESS_CODE</label>
+                <input 
+                  type="password" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                  placeholder="••••••••" 
+                  className="matrix-field" 
+                  style={{ width: '100%', marginTop: '12px', fontSize: '1.2rem', textAlign: 'center', letterSpacing: '0.3em' }} 
+                  autoFocus
+                />
+              </div>
+              <button onClick={handleLogin} className="btn-premium" style={{ width: '100%', padding: '16px', borderRadius: '16px' }}>AUTHORIZE_SESSION</button>
+              <button onClick={() => setShowLogin(false)} className="btn-micro" style={{ width: '100%', marginTop: '16px', color: 'var(--text-dim)' }}>CANCEL_REQUEST</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -57,12 +57,12 @@ cleanup() {
 # Trigger the cleanup function when we press Ctrl+C
 trap cleanup SIGINT SIGTERM EXIT
 
-echo "Starting backend server on port 1818 in the background..."
+echo "Starting backend server on port 8006 in the background..."
 cd "$ROOT_DIR"
 export PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
-"$VENV_DIR/bin/uvicorn" backend.app.main:app --host 0.0.0.0 --port 1818 --reload &
+"$VENV_DIR/bin/uvicorn" backend.app.main:app --host 0.0.0.0 --port 8006 --reload &
 BACKEND_PID=$!
 
-echo "Starting frontend dev server (port 8003) in the foreground..."
+echo "Starting frontend dev server (port 1818) in the foreground..."
 cd "$FRONTEND_DIR"
-npm run dev -- --host 0.0.0.0
+npm run dev -- --host 0.0.0.0 --port 1818

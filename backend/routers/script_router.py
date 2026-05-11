@@ -31,14 +31,20 @@ from backend.services import llm_service, platform_service, system_service
 from backend.utils.rate_limit import SlidingWindowRateLimiter
 from backend.utils.security import issue_token, verify_password
 
+from backend.core.constants import ADMIN_TOKEN_TTL_SECONDS, SUPPORTED_LANGUAGES, SESSIONS_PATH
+from backend.utils.storage import read_json, write_json
+
 router = APIRouter()
 rate_limiter = SlidingWindowRateLimiter()
-_ADMIN_SESSIONS: dict[str, datetime] = {}
 
+def _load_sessions() -> dict[str, str]:
+    return read_json(SESSIONS_PATH, dict)
+
+def _save_sessions(sessions: dict[str, str]) -> None:
+    write_json(SESSIONS_PATH, sessions)
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
 
 def _resolve_token(
     authorization: str | None = Header(default=None),
@@ -50,22 +56,32 @@ def _resolve_token(
         return authorization.split(" ", 1)[1].strip()
     return None
 
-
 def _prune_sessions() -> None:
     now = _utc_now()
-    expired = [token for token, expires_at in _ADMIN_SESSIONS.items() if expires_at <= now]
-    for token in expired:
-        _ADMIN_SESSIONS.pop(token, None)
-
+    sessions = _load_sessions()
+    expired = [t for t, expiry in sessions.items() if datetime.fromisoformat(expiry) <= now]
+    if expired:
+        for t in expired:
+            sessions.pop(t, None)
+        _save_sessions(sessions)
 
 def enforce_rate_limit(request: Request) -> None:
-    # GLOBAL_LIMITS_REMOVED_BY_ROOT
-    return
-
+    client_ip = request.client.host if request.client else "unknown"
+    config = platform_service.get_public_config()
+    limit = config.request_rate or 100
+    
+    retry_after = rate_limiter.check(client_ip, limit)
+    if retry_after:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"RATE_LIMIT_EXCEEDED: Retry in {retry_after}s",
+            headers={"Retry-After": str(retry_after)}
+        )
 
 def require_admin(token: str | None = Depends(_resolve_token)) -> str:
     _prune_sessions()
-    if not token or token not in _ADMIN_SESSIONS:
+    sessions = _load_sessions()
+    if not token or token not in sessions:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="DENIED")
     return token
 
@@ -177,15 +193,27 @@ async def sandbox_test(payload: SandboxRequest) -> SandboxResponse:
     return SandboxResponse(output=output)
 
 
+login_rate_limiter = SlidingWindowRateLimiter(window_seconds=300) # 5 minute window
+
 @router.post("/admin/login", response_model=AdminLoginResponse, dependencies=[Depends(enforce_rate_limit)])
-async def admin_login(payload: AdminLoginRequest) -> AdminLoginResponse:
+async def admin_login(request: Request, payload: AdminLoginRequest) -> AdminLoginResponse:
+    client_ip = request.client.host if request.client else "unknown"
+    # Strict brute-force check: 5 attempts per 5 minutes
+    retry_after = login_rate_limiter.check(f"login:{client_ip}", 5)
+    if retry_after:
+        raise HTTPException(status_code=429, detail=f"BRUTE_FORCE_PROTECTION: Retry in {retry_after}s")
+
     config = platform_service.get_config_internal()
     if not verify_password(payload.password, config.admin_pass_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="DENIED")
 
     token = issue_token()
     expires_at = _utc_now() + timedelta(seconds=ADMIN_TOKEN_TTL_SECONDS)
-    _ADMIN_SESSIONS[token] = expires_at
+    
+    sessions = _load_sessions()
+    sessions[token] = expires_at.isoformat()
+    _save_sessions(sessions)
+    
     platform_service.append_activity("Admin Login", "ROOT")
     return AdminLoginResponse(
         status="authenticated",

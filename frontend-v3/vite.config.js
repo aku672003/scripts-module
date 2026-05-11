@@ -3,12 +3,14 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  base: '/1818/',
   server: {
-    port: 8003,
+    port: 1818,
     proxy: {
-      '/api': {
-        target: 'http://65.1.191.126:1818',
+      '^(/1818)?/api': {
+        target: 'http://localhost:8006',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/1818/, '')
       }
     }
   }

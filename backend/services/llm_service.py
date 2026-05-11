@@ -39,15 +39,18 @@ def infer_dependency_details(code: str, language: str) -> list[DependencyDetail]
             dependencies.append(DependencyDetail(name=name, purpose=purpose))
 
     if language == "python":
-        for match in re.findall(r"^\s*import\s+([a-zA-Z0-9_\.]+)", code, flags=re.MULTILINE):
-            add(match.split(".")[0], "Imported Python module used by the script.")
+        # Handle 'import x', 'import x as y', 'from x import y', 'from x import y as z'
+        for match in re.findall(r"^\s*import\s+([a-zA-Z0-9_\.]+)(?:\s+as\s+[a-zA-Z0-9_]+)?", code, flags=re.MULTILINE):
+            for part in match.split(','):
+                add(part.strip().split(".")[0], "Imported Python module.")
         for match in re.findall(r"^\s*from\s+([a-zA-Z0-9_\.]+)\s+import", code, flags=re.MULTILINE):
-            add(match.split(".")[0], "Imported Python module used by the script.")
+            add(match.split(".")[0], "Imported Python module.")
     elif language in {"javascript", "typescript"}:
+        # Handle 'import ... from "x"', 'require("x")', 'import("x")'
         for match in re.findall(r"from\s+['\"]([^'\"]+)['\"]", code):
-            add(match, "Imported package or local module.")
-        for match in re.findall(r"require\(['\"]([^'\"]+)['\"]\)", code):
-            add(match, "CommonJS dependency.")
+            add(match, "Imported package or module.")
+        for match in re.findall(r"(?:require|import)\(['\"]([^'\"]+)['\"]\)", code):
+            add(match, "Module dependency.")
     elif language == "bash":
         for tool in ("curl", "jq", "awk", "sed", "grep", "tar", "find", "ssh", "rsync"):
             if re.search(rf"\b{tool}\b", code):
