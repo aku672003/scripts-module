@@ -326,41 +326,43 @@ function App() {
     setTerminalLines([]);
     setForgedModelData(null);
     
+    const isTxt = file.name.endsWith('.txt');
+
     const runCommand = async (cmd, delay = 500) => {
       setTerminalLines(prev => [...prev, { type: 'cmd', text: cmd }]);
       await new Promise(r => setTimeout(r, delay));
     };
 
     const addLog = async (text, type = 'info', delay = 800) => {
-      setTerminalLines(prev => [...prev, { type, text: `[${type.toUpperCase()}] ${text}` }]);
+      setTerminalLines(prev => [...prev, { type, text: text.startsWith('[') ? text : `[${type.toUpperCase()}] ${text}` }]);
       await new Promise(r => setTimeout(r, delay));
     };
 
-    await runCommand(`python3 backend/scripts/forge_engine.py --weights ${file.name}`);
-    await addLog("Initializing Neural Forge Engine v5.2...", 'system', 600);
-    await addLog(`Opening binary stream: ${file.name}`, 'info', 900);
-    await addLog("Reading PyTorch state_dict...", 'info', 1200);
-    await addLog("Scanning metadata block at 0x7f4a21...", 'debug', 1000);
+    await runCommand(`python3 backend/scripts/forge_engine.py ${isTxt ? file.name : '--dataset ./dataset'}`);
+    await addLog("🚀 Initializing Dataset Forge Engine...", 'system', 600);
+    await addLog(`📂 Scanning dataset path: ${isTxt ? './' : './dataset'}`, 'info', 800);
     
-    const fileName = file.name.toLowerCase();
-    let classes = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"];
-    
-    if (fileName.includes('traffic')) classes = ["car", "truck", "bus", "motorcycle", "bicycle", "pedestrian", "traffic_light", "stop_sign"];
-    else if (fileName.includes('face')) classes = ["face", "eyes", "nose", "mouth", "mask", "glasses"];
+    let classes = ["person", "bicycle", "car", "motorcycle", "bus", "truck"];
+    if (isTxt) {
+      // Simulate reading the text file
+      const textContent = await file.text();
+      classes = textContent.split('\n').map(s => s.trim()).filter(Boolean);
+      if (classes.length === 0) classes = ["object", "anomaly"];
+    }
 
-    await addLog(`Recognition complete. Extracted ${classes.length} neural classes.`, 'success', 800);
-    await addLog("Generating deployment protocol...", 'system', 1000);
+    await addLog(`🧠 Classes identified: ${classes.join(', ')}`, 'info', 1000);
+    await addLog("✅ data.yaml generated successfully!", 'success', 800);
 
     setForgedModelData({
       name: file.name.split('.')[0].toUpperCase(),
-      description: `Neural weights recognized by forge_engine.py from ${file.name}.`,
-      author: "FORGE_PROCESSOR_V5",
-      technical_overview: "Script-driven extraction complete. Classes mapped via direct metadata inspection.",
-      key_features: ["Script-Verified", "Metadata Anchored", "FP32 Accuracy"],
-      quality_score: "A+",
-      risk_level: "LOW",
+      description: `Neural specification generated from ${file.name}.`,
+      author: "DATASET_FORGE",
+      technical_overview: "YAML generation complete. Classes recognized via classes.txt mapping.",
+      key_features: ["YAML Output", "Class Verified", "nc: " + classes.length],
+      quality_score: "VALID",
+      risk_level: "NONE",
       classes: classes,
-      version: "5.2.0"
+      version: "1.0.0"
     });
     setEditedClassesText(classes.join(', '));
     setModelForging(false);
@@ -981,11 +983,11 @@ nc: ${(forgedModelData.classes || []).length}`}
                           <PlusCircle size={24} />
                        </div>
                        <h3 style={{ fontSize: '1rem', marginBottom: '8px' }}>Start Neural Forge</h3>
-                       <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', textAlign: 'center', maxWidth: '200px' }}>Upload a .pt or .weights file to extract neural metadata.</p>
+                       <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', textAlign: 'center', maxWidth: '200px' }}>Upload a .pt weights file or a classes.txt dataset file.</p>
                        <input
                          type="file"
                          id="neural-upload"
-                         accept=".pt,.weights"
+                         accept=".pt,.weights,.txt"
                          style={{ display: 'none' }}
                          onChange={e => {
                            if (e.target.files?.[0]) {

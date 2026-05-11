@@ -1,34 +1,61 @@
-import sys
+import os
+import yaml
 import time
-import random
+import sys
 
-def inspect_weights(file_path):
-    print(f"[SYSTEM] Initializing Neural Forge Engine v5.2...")
+# =========================
+# ⚙️ CONFIG
+# =========================
+DATASET_PATH = "dataset"
+OUTPUT_FILE = "data.yaml"
+
+def load_classes(dataset_path):
+    class_file = os.path.join(dataset_path, "classes.txt")
+    if not os.path.exists(class_file):
+        # For simulation/demo purposes, we'll look in the root if not in /dataset
+        class_file = "classes.txt" if os.path.exists("classes.txt") else class_file
+        if not os.path.exists(class_file):
+            raise FileNotFoundError("classes.txt not found")
+
+    with open(class_file, "r") as f:
+        classes = [line.strip() for line in f.readlines() if line.strip()]
+    return classes
+
+def generate_yaml(dataset_path):
+    print(f"📂 [INFO] Scanning dataset path: {dataset_path}")
     time.sleep(0.5)
-    print(f"[INFO] Opening binary stream: {file_path}")
-    time.sleep(0.8)
-    print("[INFO] Reading PyTorch state_dict...")
+    classes = load_classes(dataset_path)
+    print(f"🧠 [INFO] Classes identified: {', '.join(classes)}")
     
-    # Simulate scanning for 'names' or 'classes' key in the weights
-    time.sleep(1.2)
-    print("[DEBUG] Found metadata block at 0x7f4a21")
-    
-    # Logic to "recognise" classes based on filename or dummy scan
-    if "traffic" in file_path.lower():
-        classes = ["car", "truck", "bus", "motorcycle", "bicycle", "pedestrian", "traffic_light", "stop_sign"]
-    elif "face" in file_path.lower():
-        classes = ["face", "eyes", "nose", "mouth", "mask", "glasses"]
-    else:
-        # Default YOLOv8/v5 COCO list simulation
-        classes = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]
+    data = {
+        "path": os.path.abspath(dataset_path),
+        "train": "images/train",
+        "val": "images/val",
+        "names": classes,
+        "nc": len(classes)
+    }
+    return data
 
-    print(f"[SUCCESS] Recognition complete. Extracted {len(classes)} neural classes.")
-    print("--- RESULT_START ---")
-    print(",".join(classes))
-    print("--- RESULT_END ---")
+def save_yaml(data, output_file):
+    with open(output_file, "w") as f:
+        yaml.dump(data, f, sort_keys=False)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python forge_engine.py <file_path>")
-    else:
-        inspect_weights(sys.argv[1])
+    try:
+        # If a file is passed as argument, we treat its directory as the dataset path
+        target_path = sys.argv[1] if len(sys.argv) > 1 else DATASET_PATH
+        
+        print(f"🚀 [SYSTEM] Initializing Dataset Forge Engine...")
+        time.sleep(0.6)
+        
+        yaml_data = generate_yaml(target_path)
+        save_yaml(yaml_data, OUTPUT_FILE)
+        
+        print("--- RESULT_START ---")
+        print(",".join(yaml_data["names"]))
+        print("--- RESULT_END ---")
+        
+        time.sleep(0.4)
+        print("✅ data.yaml generated successfully!")
+    except Exception as e:
+        print(f"❌ [ERROR] {str(e)}")
