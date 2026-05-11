@@ -370,25 +370,23 @@ function App() {
       await new Promise(r => setTimeout(r, 800));
       addLog("🚀 Initializing Dataset Forge Engine...", 'system');
       await new Promise(r => setTimeout(r, 600));
-      addLog("📂 Scanning dataset path: ./dataset", 'info');
+      addLog("📂 Scanning model metadata...", 'info');
       await new Promise(r => setTimeout(r, 1000));
-      addLog("🧠 Classes identified: car, truck, pedestrian, traffic_light", 'info');
-      await new Promise(r => setTimeout(r, 800));
-      addLog("✅ data.yaml generated successfully!", 'success');
+      addLog("⚠️ Real-time backend disconnected. Using browser-side scanner.", 'error');
       
-      const fallbackClasses = ["car", "truck", "pedestrian", "traffic_light"];
+      const scannerClasses = ["Processing_Required"];
       setForgedModelData({
         name: file.name.split('.')[0].toUpperCase(),
-        description: "Neural specification (Script Recognition Simulation).",
-        author: "FORGE_ENGINE_SIM",
-        technical_overview: "Recognition complete via dataset scanning.",
-        key_features: ["nc: 4", "YAML Verified"],
-        quality_score: "VALID",
-        risk_level: "NONE",
-        classes: fallbackClasses,
+        description: "Neural specification (Offline Scanner).",
+        author: "FORGE_OFFLINE",
+        technical_overview: "Please run backend locally for full recognition via forge_engine.py.",
+        key_features: ["Manual config required"],
+        quality_score: "N/A",
+        risk_level: "UNKNOWN",
+        classes: scannerClasses,
         version: "1.0.0"
       });
-      setEditedClassesText(fallbackClasses.join(', '));
+      setEditedClassesText(scannerClasses.join(', '));
     }
 
     setModelForging(false);
