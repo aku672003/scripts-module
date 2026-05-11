@@ -36,9 +36,7 @@ function App() {
   const [notice, setNotice] = useState(null);
   const [isCompactLayout, setIsCompactLayout] = useState(false);
   const [config, setConfig] = useState({ chat_limit: 50, storage_limit: 500, node_limit: 20, request_rate: 100, broadcast: '', maintenance_mode: false });
-  // govLimits: only the numeric limits — completely isolated from broadcast
   const [govLimits, setGovLimits] = useState({ chat_limit: 50, storage_limit: 500, node_limit: 20, request_rate: 100 });
-  // broadcastDraft: standalone editable string, never touched by polling
   const [broadcastDraft, setBroadcastDraft] = useState('');
   const configInitialised = useRef(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -63,11 +61,12 @@ function App() {
   const [forgedModelData, setForgedModelData] = useState(null);
   const [neuralModels, setNeuralModels] = useState([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const chatEndRef = useRef(null);
   const termEndRef = useRef(null);
   const noticeTimeoutRef = useRef(null);
-  // Refs so interval callbacks always see live values — no stale closures
   const adminTokenRef = useRef('');
   const isAdminRef = useRef(false);
 
@@ -86,199 +85,91 @@ function App() {
     noticeTimeoutRef.current = setTimeout(() => setNotice(null), NOTICE_TIMEOUT_MS);
   };
 
-  const getAdminHeaders = (includeJson = false) => {
-    const headers = {};
-    if (includeJson) headers['Content-Type'] = 'application/json';
-    // Use ref so this always reads the CURRENT token even inside stale intervals
-    if (adminTokenRef.current) headers['X-Admin-Token'] = adminTokenRef.current;
-    return headers;
+  const addNotice = (text, type = 'info') => showNotice(text, type);
+
+  // --- SERVERLESS MOCK INFRASTRUCTURE ---
+  const MOCK_AI_RESPONSES = [
+    "Neural sequence initialized. I have analyzed your objective and optimized the protocol for maximum efficiency.",
+    "Data integrity verified. The requested script has been staged in the Archive Vault for review.",
+    "GHOST_SHELL core active. I am standing by for further instructions on the current deployment.",
+    "Protocol forge complete. The generated code adheres to all safety and performance guidelines.",
+  ];
+
+  const getLocalStorageData = (key, defaultValue) => {
+    const saved = localStorage.getItem(`ghost_shell_${key}`);
+    return saved ? JSON.parse(saved) : defaultValue;
   };
 
-  const fetchModels = useCallback(async (signal) => {
-    try {
-      const res = await fetch(`${API_BASE}/models`, { signal });
-      const data = await readResponseJson(res);
-      if (res.ok) setAiModels(data.models || []);
-    } catch (err) { if (err.name !== 'AbortError') console.error("Failed to fetch models", err); }
+  const setLocalStorageData = (key, data) => {
+    localStorage.setItem(`ghost_shell_${key}`, JSON.stringify(data));
+  };
+
+  const fetchScripts = useCallback(() => {
+    const data = getLocalStorageData('scripts', [
+      { slug: 'system-monitor', name: 'System Monitor', description: 'Real-time telemetry collector.', author: 'ROOT', language: 'python', code: '# Mock System Monitor Code\nprint("Monitoring active...")', created_at: new Date().toISOString() }
+    ]);
+    setScripts(data);
   }, []);
 
-  const forgeModel = async () => {
-    if (!modelForgeFile) return;
-    setModelForging(true);
-    setForgedModelData(null);
-    try {
-      // 1. Upload the file first
-      const formData = new FormData();
-      formData.append('file', modelForgeFile);
-      
-      const uploadRes = await fetch(`${API_BASE}/models/upload`, {
-        method: 'POST',
-        body: formData
+  const fetchDeployments = useCallback(() => {
+    const data = getLocalStorageData('deployments', []);
+    setDeployments(data);
+  }, []);
+
+  const fetchConfig = useCallback(() => {
+    const data = getLocalStorageData('config', {
+      chat_limit: 50, storage_limit: 500, node_limit: 20, request_rate: 100, maintenance_mode: false, broadcast: "GHOST_SHELL STATIC DEMO ACTIVE"
+    });
+    setConfig(data);
+    if (!configInitialised.current) {
+      setGovLimits({
+        chat_limit: data.chat_limit,
+        storage_limit: data.storage_limit,
+        node_limit: data.node_limit,
+        request_rate: data.request_rate,
       });
-      
-      if (!uploadRes.ok) {
-        showNotice('Failed to upload neural weights.', 'error');
-        setModelForging(false);
-        return;
-      }
-
-      // 2. Trigger analysis
-      const res = await fetch(`${API_BASE}/models/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: modelForgeFile.name })
-      });
-      const data = await readResponseJson(res);
-      if (res.ok) {
-        setForgedModelData(data);
-        showNotice('Neural node forged successfully.', 'success');
-      } else {
-        showNotice('Forge failed. Neural architecture invalid.', 'error');
-      }
-    } catch (err) {
-      showNotice('Communication failure during forging.', 'error');
-    } finally {
-      setModelForging(false);
+      setBroadcastDraft(data.broadcast);
+      setMaintenanceMode(data.maintenance_mode);
+      configInitialised.current = true;
     }
-  };
-
-  const fetchNeuralModels = useCallback(async (signal) => {
-    try {
-      const res = await fetch(`${API_BASE}/neural-models`, { signal });
-      const data = await readResponseJson(res);
-      if (res.ok) setNeuralModels(data.models || []);
-    } catch (err) { if (err.name !== 'AbortError') console.error('Neural fetch failure', err); }
-  }, []);
-  const saveForgedModel = async () => {
-    if (!forgedModelData) return;
-    setLoading(true);
-    try {
-      const classesDict = (forgedModelData.classes || []).map((c, i) => `    ${i}: "${c}"`).join(',\n');
-      const payload = {
-        ...forgedModelData,
-        code: `NEURAL_CLASSES = {\n${classesDict}\n}\n\n# System-extracted metadata for ${forgedModelData.name}\n# Total classes: ${(forgedModelData.classes || []).length}`,
-        language: 'python'
-      };
-      
-      const res = await fetch(`${API_BASE}/neural-models`, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(payload) 
-      });
-      
-      if (res.ok) {
-        setForgedModelData(null);
-        setModelForgeFile(null);
-        fetchNeuralModels();
-        setActiveTab('neural_vault');
-        showNotice('Neural model indexed successfully.', 'success');
-      } else {
-        showNotice('Unable to index neural model.', 'error');
-      }
-    } catch (err) {
-      showNotice('Communication failure.', 'error');
-    } finally { setLoading(false); }
-  };
-
-  const readResponseJson = async (response) => {
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) return {};
-    try {
-      return await response.json();
-    } catch (err) {
-      return {};
-    }
-  };
-
-  const getErrorMessage = (payload, fallback) => {
-    if (payload?.detail && Array.isArray(payload.detail)) {
-      return payload.detail.map(err => `${err.loc?.join('.')} ${err.msg}`).join(', ');
-    }
-    return payload?.detail || payload?.message || payload?.error || fallback;
-  };
-
-  const handleAdminAuthFailure = (response) => {
-    if (response.status === 401) {
-      setIsAdminSafe(false);
-      setAdminTokenSafe('');
-      window.sessionStorage.removeItem('script_shell_admin_token');
-      setShowLogin(true);
-      showNotice('Admin session expired. Please log in again.', 'error');
-      return true;
-    }
-    return false;
-  };
-
-
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-  useEffect(() => { termEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [terminalOutput]);
-
-  const fetchScripts = useCallback(async (signal) => {
-    try {
-      const res = await fetch(`${API_BASE}/scripts`, { signal });
-      const data = await readResponseJson(res);
-      if (res.ok) setScripts(data.scripts || []);
-    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
-  }, []);
-  const fetchDeployments = useCallback(async (signal) => {
-    try {
-      const res = await fetch(`${API_BASE}/deployments`, { signal });
-      const data = await readResponseJson(res);
-      if (res.ok) setDeployments(data.deployments || []);
-    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
-  }, []);
-  const fetchConfig = useCallback(async (signal) => {
-    try {
-      const res = await fetch(`${API_BASE}/config`, { signal });
-      const data = await readResponseJson(res);
-      if (res.ok) {
-        setConfig(data);
-        if (!configInitialised.current) {
-          setGovLimits({
-            chat_limit: data.chat_limit,
-            storage_limit: data.storage_limit,
-            node_limit: data.node_limit,
-            request_rate: data.request_rate,
-          });
-          setBroadcastDraft(data.broadcast || '');
-          setMaintenanceMode(!!data.maintenance_mode);
-          configInitialised.current = true;
-        }
-      }
-    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
-  }, []);
-  const fetchLanguages = useCallback(async (signal) => {
-    try {
-      const res = await fetch(`${API_BASE}/languages`, { signal });
-      const data = await readResponseJson(res);
-      if (res.ok && Array.isArray(data.languages) && data.languages.length > 0) {
-        setAvailableLanguages(data.languages);
-        setSelectedLanguage(current => data.languages.includes(current) ? current : data.languages[0]);
-        setDeployForm(current => ({ ...current, language: data.languages.includes(current.language) ? current.language : data.languages[0] }));
-      }
-    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
-  }, []);
-  const fetchHealth = useCallback(async (signal) => {
-    try {
-      const res = await fetch(`${API_BASE}/admin/system/health`, { headers: getAdminHeaders(), signal });
-      if (handleAdminAuthFailure(res)) return;
-      const data = await readResponseJson(res);
-      if (!res.ok) return;
-      setSystemHealth(data);
-      setHealthHistory(prev => [...prev.slice(-15), data.cpu_usage]);
-    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
-  }, []);
-  const fetchActivity = useCallback(async (signal) => {
-    try {
-      const res = await fetch(`${API_BASE}/admin/activity`, { headers: getAdminHeaders(), signal });
-      if (handleAdminAuthFailure(res)) return;
-      const data = await readResponseJson(res);
-      if (!res.ok) return;
-      setActivityFeed(data.activity || []);
-    } catch (err) { if (err.name !== 'AbortError') console.error(err); }
   }, []);
 
-  // One-time mount effect — no dependencies on isAdmin/adminToken to avoid restarts
+  const fetchLanguages = useCallback(() => {
+    const langs = ["python", "javascript", "bash", "rust", "go", "typescript"];
+    setAvailableLanguages(langs);
+    setSelectedLanguage(langs[0]);
+    setDeployForm(c => ({ ...c, language: langs[0] }));
+  }, []);
+
+  const fetchHealth = useCallback(() => {
+    setSystemHealth({
+      cpu_usage: Math.floor(Math.random() * 20) + 5,
+      memory_usage: 1024 + Math.floor(Math.random() * 512),
+      active_threads: 12,
+      disk_io: 45,
+      network_latency: 12,
+      uptime_seconds: 3600,
+      ollama_status: "running"
+    });
+    setHealthHistory(prev => [...prev.slice(-15), Math.floor(Math.random() * 20) + 5]);
+  }, []);
+
+  const fetchActivity = useCallback(() => {
+    const data = getLocalStorageData('activity', [
+      { action: "Platform Initialized", user: "SYSTEM", timestamp: new Date().toISOString(), details: {} }
+    ]);
+    setActivityFeed(data);
+  }, []);
+
+  const fetchModels = useCallback(() => {
+    setAiModels(["qwen3:4b", "llama3:8b", "mistral:7b"]);
+  }, []);
+
+  const fetchNeuralModels = useCallback(() => {
+    const data = getLocalStorageData('neural_models', []);
+    setNeuralModels(data);
+  }, []);
+
   useEffect(() => {
     const savedToken = window.sessionStorage.getItem('script_shell_admin_token');
     if (savedToken) {
@@ -291,219 +182,182 @@ function App() {
     syncLayout();
     window.addEventListener('resize', syncLayout);
     
-    // Initial fetch
-    const controller = new AbortController();
-    const { signal } = controller;
-    
-    fetchScripts(signal); 
-    fetchDeployments(signal); 
-    fetchConfig(signal); 
-    fetchLanguages(signal); 
-    fetchModels(signal); 
-    fetchNeuralModels(signal);
+    fetchScripts(); fetchDeployments(); fetchConfig(); fetchLanguages(); fetchModels(); fetchNeuralModels();
     
     const interval = setInterval(() => {
-      fetchConfig(signal);
-      fetchDeployments(signal);
-      fetchModels(signal);
-      if (isAdminRef.current) { 
-        fetchHealth(signal); 
-        fetchActivity(signal); 
-        fetchNeuralModels(signal); 
-      }
+      fetchConfig();
+      fetchDeployments();
+      fetchModels();
+      if (isAdminRef.current) { fetchHealth(); fetchActivity(); fetchNeuralModels(); }
     }, 4000);
 
     return () => {
-      controller.abort();
       clearInterval(interval);
       window.removeEventListener('resize', syncLayout);
-      if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
     };
   }, [fetchConfig, fetchScripts, fetchDeployments, fetchModels, fetchHealth, fetchActivity, fetchLanguages, fetchNeuralModels]);
 
-  const updateConfig = async (patch) => {
-    try {
-      const res = await fetch(`${API_BASE}/config`, {
-        method: 'POST',
-        headers: getAdminHeaders(true),
-        body: JSON.stringify(patch)
-      });
-      if (handleAdminAuthFailure(res)) return;
-      const data = await readResponseJson(res);
-      if (res.ok) {
-        // Reflect saved values back into config and editable states
-        setConfig(prev => ({ ...prev, ...patch }));
-        if (patch.broadcast !== undefined) setBroadcastDraft(patch.broadcast);
-        if (patch.maintenance_mode !== undefined) setMaintenanceMode(patch.maintenance_mode);
-        if (patch.chat_limit !== undefined || patch.storage_limit !== undefined || patch.node_limit !== undefined || patch.request_rate !== undefined) {
-           setGovLimits(prev => ({
-             chat_limit: patch.chat_limit ?? prev.chat_limit,
-             storage_limit: patch.storage_limit ?? prev.storage_limit,
-             node_limit: patch.node_limit ?? prev.node_limit,
-             request_rate: patch.request_rate ?? prev.request_rate,
-           }));
-        }
-        showNotice('Governance updated successfully.', 'success');
-      } else {
-        const error = getErrorMessage(data, 'Unable to update governance settings.');
-        showNotice(`Update Failed: ${error}`, 'error');
-      }
-    } catch (err) {
-      showNotice('Communication failure during governance sync.', 'error');
+  const updateConfig = (patch) => {
+    const newConfig = { ...config, ...patch };
+    setLocalStorageData('config', newConfig);
+    setConfig(newConfig);
+    if (patch.broadcast !== undefined) setBroadcastDraft(patch.broadcast);
+    if (patch.maintenance_mode !== undefined) setMaintenanceMode(patch.maintenance_mode);
+    if (patch.chat_limit !== undefined || patch.storage_limit !== undefined || patch.node_limit !== undefined || patch.request_rate !== undefined) {
+      setGovLimits(prev => ({
+        chat_limit: patch.chat_limit ?? prev.chat_limit,
+        storage_limit: patch.storage_limit ?? prev.storage_limit,
+        node_limit: patch.node_limit ?? prev.node_limit,
+        request_rate: patch.request_rate ?? prev.request_rate,
+      }));
     }
+    showNotice('Governance updated successfully.', 'success');
   };
 
-  const sendMessage = async () => {
-    if (!userInput.trim() || loading) return;
-    const prompt = userInput.trim();
-    setMessages(prev => [...prev, { id: Date.now(), role: 'user', text: prompt }]);
-    setUserInput(''); setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, history: messages })
-      });
-      const data = await readResponseJson(res);
-      if (res.ok && data.response) {
-        setMessages(prev => [...prev, { id: Date.now() + 1, role: 'bot', text: data.response }]);
-      } else {
-        const message = getErrorMessage(data, 'The neural response pipeline is currently unavailable.');
-        setMessages(prev => [...prev, { id: Date.now() + 1, role: 'bot', text: message }]);
-        showNotice(message, 'error');
-      }
-    } catch (err) {
-      const message = 'Unable to reach the chat service.';
-      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'bot', text: message }]);
-      showNotice(message, 'error');
-    } finally { setLoading(false); }
+  const handleChatSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!userInput.trim() || isChatLoading) return;
+    const userMsg = { id: Date.now(), role: 'user', text: userInput };
+    setMessages(prev => [...prev, userMsg]);
+    setUserInput('');
+    setIsChatLoading(true);
+    
+    setTimeout(() => {
+      const aiMsg = { id: Date.now() + 1, role: 'assistant', text: MOCK_AI_RESPONSES[Math.floor(Math.random() * MOCK_AI_RESPONSES.length)] };
+      setMessages(prev => [...prev, aiMsg]);
+      setIsChatLoading(false);
+    }, 1500);
   };
 
   const analyzeCode = async () => {
     if (!deployForm.code) return;
     setAnalyzing(true);
-    try {
-      const res = await fetch(`${API_BASE}/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: deployForm.code, language: deployForm.language }) });
-      const data = await readResponseJson(res);
-      if (res.ok) {
-        setDeployForm(prev => ({ 
-          ...prev, 
-          ...data,
-          language: data.language || prev.language,
-          author: data.author || prev.author || "UNKNOWN_OPERATOR",
-          name: data.name || prev.name || "UNNAMED_PROTOCOL",
-          description: data.description || data.technical_overview || prev.description 
-        }));
-        showNotice('Analysis completed.', 'success');
-      } else {
-        showNotice(getErrorMessage(data, 'Code analysis failed.'), 'error');
-      }
-    } catch (err) {
-      showNotice('Code analysis failed.', 'error');
-    } finally { setAnalyzing(false); }
+    setTimeout(() => {
+      setDeployForm(prev => ({
+        ...prev,
+        name: "ANALYSED_PROTOCOL_" + Math.floor(Math.random() * 1000),
+        description: "Static analysis completed on neural stream. High efficiency detected.",
+        author: "STATIC_ANALYSER",
+        quality_score: "A",
+        version: "1.0.0"
+      }));
+      showNotice('Analysis completed.', 'success');
+      setAnalyzing(false);
+    }, 1500);
   };
 
   const finalizeDeployment = async () => {
     if (!deployForm.name || !deployForm.code) return;
     setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/scripts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(deployForm) });
-      const data = await readResponseJson(res);
-      if (res.ok) {
-        setDeployForm({ name: '', description: '', author: '', language: availableLanguages[0] || 'python', code: '', quality_score: 'B', version: '1.0.0' });
-        fetchScripts();
-        setActiveTab('library');
-        showNotice('Protocol indexed successfully.', 'success');
-      } else {
-        showNotice(getErrorMessage(data, 'Unable to index this protocol.'), 'error');
-      }
-    } catch (err) {
-      showNotice('Unable to index this protocol.', 'error');
-    } finally { setLoading(false); }
+    setTimeout(() => {
+      const newScript = {
+        ...deployForm,
+        slug: deployForm.name.toLowerCase().replace(/ /g, '-'),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const current = getLocalStorageData('scripts', []);
+      setLocalStorageData('scripts', [...current, newScript]);
+      setScripts([...current, newScript]);
+      setDeployForm({ name: '', description: '', author: '', language: availableLanguages[0] || 'python', code: '', quality_score: 'B', version: '1.0.0' });
+      showNotice('Protocol indexed successfully.', 'success');
+      setLoading(false);
+      setActiveTab('library');
+    }, 1000);
   };
 
   const stageScript = async (script) => {
-    try {
-      const res = await fetch(`${API_BASE}/stage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(script) });
-      const data = await readResponseJson(res);
-      if (res.ok) {
-        fetchDeployments();
-        showNotice(`Staged ${script.name}.`, 'success');
-      } else {
-        showNotice(getErrorMessage(data, 'Unable to stage this protocol.'), 'error');
-      }
-    } catch (err) {
-      showNotice('Unable to stage this protocol.', 'error');
-    }
+    const newDep = {
+      ...script,
+      status: "STAGED",
+      staged_at: new Date().toISOString(),
+      deployed_at: null
+    };
+    const current = getLocalStorageData('deployments', []);
+    const updated = [...current, newDep];
+    setLocalStorageData('deployments', updated);
+    setDeployments(updated);
+    showNotice(`Staged ${script.name}.`, 'success');
   };
 
   const deployToDisk = async (name) => {
-    try {
-      const res = await fetch(`${API_BASE}/deployments/${encodeURIComponent(name)}/deploy`, { method: 'POST', headers: getAdminHeaders() });
-      if (handleAdminAuthFailure(res)) return;
-      const data = await readResponseJson(res);
-      if (!res.ok) {
-        showNotice(getErrorMessage(data, `Unable to activate ${name}.`), 'error');
-        return;
-      }
-      fetchDeployments();
-      showNotice(`Activated ${name}.`, 'success');
-    } catch (err) {
-      showNotice(`Unable to activate ${name}.`, 'error');
-    }
+    const current = getLocalStorageData('deployments', []);
+    const updated = current.map(d => d.name === name ? { ...d, status: 'DEPLOYED', deployed_at: new Date().toISOString() } : d);
+    setLocalStorageData('deployments', updated);
+    setDeployments(updated);
+    showNotice(`${name} activated successfully.`, 'success');
+  };
+
+  const terminateDeployment = async (name) => {
+    const current = getLocalStorageData('deployments', []);
+    const updated = current.map(d => d.name === name ? { ...d, status: 'TERMINATED' } : d);
+    setLocalStorageData('deployments', updated);
+    setDeployments(updated);
+    showNotice(`${name} terminated.`, 'success');
   };
 
   const deleteDeployment = async (name) => {
     if (!window.confirm(`TERMINATE_NODE: Permanently wipe ${name}?`)) return;
-    try {
-      const res = await fetch(`${API_BASE}/deployments/${encodeURIComponent(name)}`, { method: 'DELETE', headers: getAdminHeaders() });
-      if (handleAdminAuthFailure(res)) return;
-      const data = await readResponseJson(res);
-      if (!res.ok) {
-        showNotice(getErrorMessage(data, `Unable to terminate ${name}.`), 'error');
-        return;
-      }
-      fetchDeployments();
-      showNotice(`Terminated ${name}.`, 'success');
-    } catch (err) {
-      showNotice(`Unable to terminate ${name}.`, 'error');
-    }
+    const current = getLocalStorageData('deployments', []);
+    const updated = current.filter(d => d.name !== name);
+    setLocalStorageData('deployments', updated);
+    setDeployments(updated);
+    showNotice(`${name} removed from registry.`, 'success');
   };
 
   const deleteScript = async (name) => {
     if (!window.confirm(`PURGE_PROTOCOL: Permanently wipe ${name} from Archive Vault?`)) return;
-    try {
-      const res = await fetch(`${API_BASE}/scripts/${encodeURIComponent(name)}`, { method: 'DELETE', headers: getAdminHeaders() });
-      if (handleAdminAuthFailure(res)) return;
-      const data = await readResponseJson(res);
-      if (!res.ok) {
-        showNotice(getErrorMessage(data, `Unable to purge ${name}.`), 'error');
-        return;
-      }
-      fetchScripts();
-      showNotice(`Purged ${name} from archive.`, 'success');
-    } catch (err) {
-      showNotice(`Unable to purge ${name}.`, 'error');
-    }
+    const current = getLocalStorageData('scripts', []);
+    const updated = current.filter(s => s.name !== name);
+    setLocalStorageData('scripts', updated);
+    setScripts(updated);
+    showNotice(`Purged ${name} from archive.`, 'success');
+  };
+
+  const forgeModel = async () => {
+    if (!modelForgeFile) return;
+    setModelForging(true);
+    setTimeout(() => {
+      setForgedModelData({
+        name: modelForgeFile.name.split('.')[0],
+        description: "Neural core logic extracted from binary weights.",
+        author: "FORGE_PROCESS",
+        technical_overview: "Advanced neural patterns detected. Optimization level: ALPHA.",
+        key_features: ["Neural Link", "Pattern Recognition", "Logic Synthesis"],
+        quality_score: "A",
+        risk_level: "LOW",
+        classes: ["object", "anomaly", "pattern"]
+      });
+      showNotice('Neural model forged successfully.', 'success');
+      setModelForging(false);
+    }, 2000);
+  };
+
+  const saveForgedModel = async () => {
+    if (!forgedModelData) return;
+    const newScript = {
+      ...forgedModelData,
+      slug: forgedModelData.name.toLowerCase().replace(/ /g, '-'),
+      code: '# Forged Neural Logic\nprint("Neural model active")',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    const current = getLocalStorageData('scripts', []);
+    setLocalStorageData('scripts', [...current, newScript]);
+    setScripts([...current, newScript]);
+    setForgedModelData(null);
+    setModelForgeFile(null);
+    showNotice('Forged model indexed to vault.', 'success');
+    setActiveTab('neural_vault');
   };
 
   const deleteNeuralModel = async (name) => {
     if (!window.confirm(`PURGE_MODEL: Permanently wipe ${name}?`)) return;
-    try {
-      const res = await fetch(`${API_BASE}/neural-models/${encodeURIComponent(name)}`, { 
-        method: 'DELETE', 
-        headers: getAdminHeaders() 
-      });
-      if (handleAdminAuthFailure(res)) return;
-      if (res.ok) {
-        fetchNeuralModels();
-        showNotice(`Purged ${name}.`, 'success');
-      } else {
-        showNotice(`Unable to purge ${name}.`, 'error');
-      }
-    } catch (err) {
-      showNotice(`Communication failure.`, 'error');
-    }
+    const current = getLocalStorageData('neural_models', []);
+    const updated = current.filter(m => m.name !== name);
+    setLocalStorageData('neural_models', updated);
+    setNeuralModels(updated);
+    showNotice(`Purged ${name}.`, 'success');
   };
 
   const handleTerminalKeyDown = (e) => {
@@ -523,61 +377,37 @@ function App() {
     }
   };
 
-  const execTerminal = async () => {
+  const execTerminal = () => {
     if (!terminalInput.trim()) return;
     const cmd = terminalInput; setTerminalHistory(prev => [...prev, cmd]); setHistoryIndex(-1); setTerminalInput('');
     setTerminalOutput(prev => [...prev, { type: 'in', text: `root@script_shell:~$ ${cmd}` }]);
-    try {
-      setTerminalLoading(true);
-      const res = await fetch(`${API_BASE}/admin/terminal`, { method: 'POST', headers: getAdminHeaders(true), body: JSON.stringify({ command: cmd }) });
-      if (handleAdminAuthFailure(res)) return;
-      const data = await readResponseJson(res);
-      const outputType = res.ok && !(data.output || '').startsWith('ERROR') ? 'out' : 'err';
-      setTerminalOutput(prev => [...prev, { type: outputType, text: data.output || 'TERMINAL_IO_FAILURE' }]);
-    } catch (err) {
-      setTerminalOutput(prev => [...prev, { type: 'err', text: `TERMINAL_IO_FAILURE` }]);
-      showNotice('Terminal command failed.', 'error');
-    } finally {
-      setTerminalLoading(false);
-    }
+    setTimeout(() => {
+      setTerminalOutput(prev => [...prev, { type: 'out', text: `Executing: ${cmd}...\nCommand simulated successfully in static mode.` }]);
+    }, 500);
   };
 
-  const runSandbox = async () => {
+  const runSandbox = () => {
     if (!sandboxCode.trim()) return;
     setSandboxing(true); setSandboxOutput('NEURAL_SIMULATION_ACTIVE...');
-    try {
-      const res = await fetch(`${API_BASE}/admin/sandbox`, { method: 'POST', headers: getAdminHeaders(true), body: JSON.stringify({ code: sandboxCode }) });
-      if (handleAdminAuthFailure(res)) return;
-      const data = await readResponseJson(res);
-      if (res.ok) {
-        setSandboxOutput(data.output);
-      } else {
-        const message = getErrorMessage(data, 'Sandbox simulation failed.');
-        setSandboxOutput(message);
-        showNotice(message, 'error');
-      }
-    } catch (err) {
-      setSandboxOutput('FAILURE');
-      showNotice('Sandbox simulation failed.', 'error');
-    } finally { setSandboxing(false); }
+    setTimeout(() => {
+      setSandboxOutput('Simulation successful.\nNo logic breaches detected.\nOutput: Hello from GHOST_SHELL');
+      setSandboxing(false);
+    }, 1500);
   };
 
-  const handleLogin = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: adminPass }) });
-      const data = await readResponseJson(res);
-      if (res.ok && data.token) {
-        window.sessionStorage.setItem('script_shell_admin_token', data.token);
-        setAdminTokenSafe(data.token);
-        setIsAdminSafe(true);
-        setShowLogin(false);
-        setAdminPass('');
-        setActiveTab('admin');
-        showNotice('Admin authentication successful.', 'success');
-      } else {
-        showNotice(getErrorMessage(data, 'Admin authentication failed.'), 'error');
-      }
-    } catch (err) { showNotice('Unable to reach the admin login service.', 'error'); }
+  const handleLogin = () => {
+    if (adminPass === 'admin123') {
+      const token = 'mock_token_' + Date.now();
+      window.sessionStorage.setItem('script_shell_admin_token', token);
+      setAdminTokenSafe(token);
+      setIsAdminSafe(true);
+      setShowLogin(false);
+      setAdminPass('');
+      setActiveTab('admin');
+      showNotice('Admin authentication successful.', 'success');
+    } else {
+      showNotice('ACCESS DENIED: Invalid Credentials', 'error');
+    }
   };
 
   const handleLogout = () => {
@@ -692,9 +522,7 @@ function App() {
     config.maintenance_mode
       ? { tone: 'danger', title: 'Maintenance lock enabled', description: 'Write operations are paused until governance reopens the platform.' }
       : { tone: 'success', title: 'Operations ready', description: 'The platform is currently accepting chat, archive, and deployment actions.' },
-    systemHealth.ollama_status === 'online'
-      ? { tone: 'success', title: 'Model channel online', description: `Local generation is reachable with ${systemHealth.network_latency || 0}ms response latency.` }
-      : { tone: 'warning', title: 'Model fallback active', description: 'The UI stays usable even when the local model is offline or still booting.' },
+    { tone: 'success', title: 'Model channel online', description: `Static simulation is active and responding.` },
     deployedCount > 0
       ? { tone: 'info', title: `${deployedCount} live node${deployedCount === 1 ? '' : 's'} active`, description: 'Deployment tracking is reflecting actively promoted protocols.' }
       : { tone: 'info', title: 'No live nodes yet', description: 'Stage and activate a protocol to populate live operations.' }
@@ -868,7 +696,7 @@ function App() {
                 </div>
               </div>
               <div className="chat-feed custom-scrollbar">
-                {messages.length === 1 && !loading && (
+                {messages.length === 1 && !isChatLoading && (
                   <div className="prompt-grid">
                     {quickPrompts.map((item) => (
                       <button
@@ -918,7 +746,7 @@ function App() {
                     </div>
                   </motion.div>
                 ))}
-                {loading && <div className="loading-row" style={{ display: 'flex', gap: '8px', padding: '12px 24px' }}><div className="status-dot"/><div className="status-dot"/><div className="status-dot"/></div>}
+                {isChatLoading && <div className="loading-row" style={{ display: 'flex', gap: '8px', padding: '12px 24px' }}><div className="status-dot"/><div className="status-dot"/><div className="status-dot"/></div>}
                 <div ref={chatEndRef} />
               </div>
               <div className="input-matrix">
@@ -929,7 +757,7 @@ function App() {
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        sendMessage();
+                        handleChatSubmit();
                       }
                     }} 
                     placeholder="State your neural objective..." 
@@ -937,13 +765,13 @@ function App() {
                     rows={1}
                     style={{ height: 'auto' }}
                   />
-                  <button onClick={sendMessage} className="composer-send" disabled={loading || !userInput.trim()}>
-                    {loading ? <RefreshCcw size={20} className="spin" /> : <Zap size={20} fill="currentColor" />}
+                  <button onClick={() => handleChatSubmit()} className="composer-send" disabled={isChatLoading || !userInput.trim()}>
+                    {isChatLoading ? <RefreshCcw size={20} className="spin" /> : <Zap size={20} fill="currentColor" />}
                   </button>
                 </div>
                 <div className="composer-footer">
                   <span className="composer-caption">Shift + Enter for new line</span>
-                  <StatusBadge label={loading ? 'Thinking' : 'Ready'} tone={loading ? 'warning' : 'success'} />
+                  <StatusBadge label={isChatLoading ? 'Thinking' : 'Ready'} tone={isChatLoading ? 'warning' : 'success'} />
                 </div>
               </div>
             </motion.div>
@@ -1427,9 +1255,11 @@ nc: ${(forgedModelData.classes || []).length}`}
                         const name = inspectDeployment.name;
                         const isLive = !!inspectDeployment.status;
                         if (isLive) {
-                          deleteDeployment(name).then(() => setInspectDeployment(null));
+                          deleteDeployment(name);
+                          setInspectDeployment(null);
                         } else {
-                          deleteScript(name).then(() => setInspectDeployment(null));
+                          deleteScript(name);
+                          setInspectDeployment(null);
                         }
                       }} 
                       className="btn-micro danger" 
@@ -1548,9 +1378,7 @@ nc: ${(forgedModelData.classes || []).length}`}
                           <h3 className="heading-cyber" style={{ fontSize: '0.8rem' }}>CORE_DEPENDENCIES</h3>
                         </div>
                       </div>
-                      {/* Code block */}
                       <div style={{ background: '#000', borderRadius: '20px', border: '1px solid rgba(0,242,255,0.1)', overflow: 'hidden' }}>
-                        {/* Header bar */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: 'rgba(0,242,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57', display: 'inline-block' }} />
@@ -1568,7 +1396,6 @@ nc: ${(forgedModelData.classes || []).length}`}
                             COPY
                           </button>
                         </div>
-                        {/* Code lines */}
                         <pre className="mono custom-scrollbar" style={{ margin: 0, padding: '20px 24px', fontSize: '0.82rem', lineHeight: '2', color: '#7ec8a0', overflowX: 'auto', whiteSpace: 'pre' }}>
                           <code>{annotated}</code>
                         </pre>
@@ -1581,7 +1408,6 @@ nc: ${(forgedModelData.classes || []).length}`}
           </motion.div>
         )}
       </AnimatePresence>
-
 
       <AnimatePresence>
         {showLogin && (
@@ -1596,8 +1422,8 @@ nc: ${(forgedModelData.classes || []).length}`}
                 <label className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)', letterSpacing: '0.1em' }}>ACCESS_CODE</label>
                 <input 
                   type="password" 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)} 
+                  value={adminPass} 
+                  onChange={e => setAdminPass(e.target.value)} 
                   onKeyDown={e => e.key === 'Enter' && handleLogin()}
                   placeholder="••••••••" 
                   className="matrix-field" 
