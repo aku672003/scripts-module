@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from backend.core.constants import DEFAULT_OLLAMA_MODEL, FRONTEND_DIST_DIR
 from backend.routers import script_router
-from backend.services import platform_service
+from backend.services import platform_service, forge_service
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,22 @@ app.add_middleware(
 )
 
 app.include_router(script_router.router, prefix="/api/v1")
+
+@app.post("/api/forge")
+async def forge_model(request: Request):
+    form = await request.form()
+    file = form.get("file")
+    if not file:
+        return JSONResponse({"error": "No file uploaded"}, status_code=400)
+    
+    # Save temp file
+    temp_path = Path("temp_model.pt")
+    with open(temp_path, "wb") as f:
+        f.write(await file.read())
+        
+    # Run the user's script logic
+    result = await forge_service.run_forge_script(str(temp_path))
+    return JSONResponse(result)
 
 
 @app.middleware("http")
