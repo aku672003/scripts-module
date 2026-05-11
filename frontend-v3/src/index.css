@@ -14,9 +14,9 @@
   --text-secondary: #b4b4b4;
   --text-dim: #676767;
   
-  --radius-xl: 12px;
-  --radius-lg: 8px;
-  --radius-md: 6px;
+  --radius-xl: 10px;
+  --radius-lg: 6px;
+  --radius-md: 4px;
   
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -89,10 +89,10 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: var(--radius-lg);
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -137,7 +137,7 @@ body {
   max-width: 800px;
   width: 100%;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 24px 20px;
 }
 
 /* Welcome Screen */
@@ -220,7 +220,7 @@ body {
   width: 100%;
   display: flex;
   gap: 16px;
-  padding: 24px 20px;
+  padding: 16px 20px;
 }
 
 .avatar {
@@ -244,8 +244,8 @@ body {
 
 .message-text {
   flex: 1;
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 0.9rem;
+  line-height: 1.5;
   color: var(--text-primary);
 }
 
@@ -259,11 +259,11 @@ body {
 }
 
 .input-wrapper {
-  max-width: 800px;
+  max-width: 720px;
   width: 100%;
   background-color: var(--surface);
-  border-radius: 26px;
-  padding: 10px 14px 10px 20px;
+  border-radius: 20px;
+  padding: 8px 12px 8px 16px;
   display: flex;
   align-items: flex-end;
   gap: 12px;
@@ -276,9 +276,9 @@ body {
   background: none;
   border: none;
   color: var(--text-primary);
-  font-size: 1rem;
-  padding: 8px 0;
-  max-height: 200px;
+  font-size: 0.9rem;
+  padding: 4px 0;
+  max-height: 150px;
   resize: none;
   outline: none;
 }
